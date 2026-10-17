@@ -1,7 +1,7 @@
 import { test, expect, vi } from 'vitest';
 import {
   ganhosPan, initAudio, CA2_CarregaEfeito, CA2_TocaEfeito, CA2_TocaEfeitoTela, CA2_AjustaVolume,
-  CA2_CarregaMusica, CA2_TocaMusica, CA2_PausaMusica, CA2_ContinuaMusica, desbloqueiaAudio, portaSilenciosa, criaPortaWebAudio, type AudioPort,
+  CA2_CarregaMusica, CA2_TocaMusica, CA2_PausaMusica, CA2_ContinuaMusica, desbloqueiaAudio, portaSilenciosa, criaPortaWebAudio, portaOuSilenciosa, type AudioPort,
 } from '../../src/engine/audio';
 
 const fake = (unlocked = true) => {
@@ -180,4 +180,79 @@ test('web port: music refused during an iOS interruption starts as soon as the c
     expect(plays).toEqual(['interrupted', 'running']); // refused inside the gesture, started right after resume()
     expect(port.desbloqueado()).toBe(true);
   } finally { vi.unstubAllGlobals(); }
+});
+
+test('initAudio prepares every manifest track up front, so the first gesture can bless them (iOS)', async () => {
+  const f = fake(false); const preparadas: string[] = [];
+  f.port.preparaMusica = (m4a, ogg) => { preparadas.push(`${m4a}|${ogg}`); };
+  await initAudio(f.port, { ...man, music: { './m/a.ogg': { m4a: 'a.m4a', ogg: 'a.ogg' }, './m/b.ogg': { m4a: 'b.m4a', ogg: 'b.ogg' } } });
+  expect(preparadas).toEqual(['a.m4a|a.ogg', 'b.m4a|b.ogg']); // before any CA2_CarregaMusica
+});
+
+/** Web Audio / HTMLAudioElement stand-ins for criaPortaWebAudio: every play() is recorded with src + muted. */
+function stubWebAudio(estadoInicial: string) {
+  const estado = { s: estadoInicial };
+  const plays: { src: string; muted: boolean; resolve: () => void; reject: () => void }[] = [];
+  const no = () => ({ connect() {}, disconnect() {}, gain: { value: 1 } });
+  class CtxFalso {
+    get state(): string { return estado.s; }
+    destination = {};
+    currentTime = 0;
+    createGain() { return no(); }
+    createMediaElementSource() { return no(); }
+    async resume(): Promise<void> { estado.s = 'running'; }
+  }
+  class AudioFalso {
+    preload = ''; src = ''; loop = false; muted = false; currentTime = 0;
+    canPlayType(): string { return ''; }
+    pause(): void {}
+    play(): Promise<void> {
+      return new Promise((resolve, reject) => { plays.push({ src: this.src, muted: this.muted, resolve: () => resolve(), reject: () => reject(new Error('NotAllowedError')) }); });
+    }
+  }
+  vi.stubGlobal('AudioContext', CtxFalso);
+  vi.stubGlobal('Audio', AudioFalso);
+  return { estado, plays };
+}
+
+test('web port: the first desbloqueiaAudio() blesses both manifest tracks inside the gesture (iOS menu music)', async () => {
+  const { plays } = stubWebAudio('suspended');
+  try {
+    await initAudio(criaPortaWebAudio(''), { ...man, sounds: {}, music: {
+      './dados/sons/recharge_alvys18.ogg': { m4a: 'menu.m4a', ogg: 'menu.ogg' }, './dados/sons/esprit.ogg': { m4a: 'jogo.m4a', ogg: 'jogo.ogg' } } });
+    expect(plays).toEqual([]);
+    const gesto = desbloqueiaAudio(); // splash tap: no CA2_CarregaMusica has run yet
+    expect(plays.map(p => [p.src, p.muted])).toEqual([['menu.ogg', true], ['jogo.ogg', true]]); // synchronously, in the gesture
+    await gesto;
+  } finally { vi.unstubAllGlobals(); }
+});
+
+test('web port: a play() that resolves late blesses its own track, not the one current by then', async () => {
+  const { plays } = stubWebAudio('running');
+  try {
+    const port = criaPortaWebAudio('');
+    port.musica('a.m4a', 'a.ogg', 1, true);   // A.play() pending
+    port.musica('b.m4a', 'b.ogg', 1, true);   // B becomes current, B.play() pending
+    expect(plays.map(p => p.src)).toEqual(['a.ogg', 'b.ogg']);
+    plays[0].resolve(); plays[1].reject();    // A's (stale) play succeeds, B's is refused
+    await Promise.resolve(); await Promise.resolve();
+    port.musica('a.m4a', 'a.ogg', 1, true);   // back to A
+    await port.desbloqueia();                 // B was never blessed → must be blessed (muted play) now
+    expect(plays.slice(3).map(p => [p.src, p.muted])).toEqual([['b.ogg', true]]);
+  } finally { vi.unstubAllGlobals(); }
+});
+
+test('portaOuSilenciosa: a throwing Web Audio factory falls back to the silent port with a warning (boot never hangs)', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const erro = new Error('AudioContext blocked');
+    const p = portaOuSilenciosa(() => { throw erro; });
+    expect(p.desbloqueado()).toBe(true);
+    expect(() => p.musica('a', 'b', 1)).not.toThrow();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]).toContain(erro);
+    const real = fake().port;
+    expect(portaOuSilenciosa(() => real)).toBe(real);
+    expect(warn).toHaveBeenCalledTimes(1);
+  } finally { warn.mockRestore(); }
 });

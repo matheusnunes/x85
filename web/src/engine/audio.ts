@@ -71,7 +71,12 @@ export function initAudio(port: AudioPort, manifest: Manifest): Promise<void> {
   musicasManifest = new Map();
   ocupado = Array.from({ length: MAX_CANAIS }, () => false);
   volMusica = 100; volEfeitos = 100; // orig: chienaudio2.cpp:99 CA2_AjustaVolume(100, 100)
-  for (const [k, e] of Object.entries(manifest.music)) musicasManifest.set(normaliza(k), e);
+  for (const [k, e] of Object.entries(manifest.music)) {
+    musicasManifest.set(normaliza(k), e);
+    // iOS: create every track element now, so the first gesture (the start splash) blesses all of them —
+    // menu_carrega later starts the menu music outside any gesture
+    port.preparaMusica?.(e.m4a, e.ogg);
+  }
   const tarefas: Promise<void>[] = [];
   for (const [k, e] of Object.entries(manifest.sounds)) {
     const chave = normaliza(k);
@@ -160,6 +165,16 @@ export function CA2_AjustaVolume(musica: number, efeitos_: number): void {
   porta?.volumeMusica(ganhoVolume(volMusica));
 }
 
+/** Builds the real port; if that throws (no / blocked AudioContext) warns and returns the silent port (boot goes on). */
+export function portaOuSilenciosa(fabrica: () => AudioPort): AudioPort {
+  try {
+    return fabrica();
+  } catch (erro) {
+    console.warn('CA2: Web Audio indisponível, o jogo segue sem som', erro);
+    return portaSilenciosa();
+  }
+}
+
 /** Headless port: always unlocked, silent; voices are freed immediately. */
 export function portaSilenciosa(): AudioPort {
   return {
@@ -212,9 +227,10 @@ export function criaPortaWebAudio(base = ''): AudioPort {
     return f;
   };
   const tocaAtual = (): void => {
-    if (!atual || pausada) return;
+    const f = atual; // captured: by the time play() settles another track may be current
+    if (!f || pausada) return;
     pendente = false;
-    atual.el.play().then(() => { if (atual) atual.abencoada = true; }, () => { pendente = true; });
+    f.el.play().then(() => { f.abencoada = true; }, () => { if (atual === f) pendente = true; });
   };
 
   return {
