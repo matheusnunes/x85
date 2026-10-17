@@ -5,7 +5,7 @@ import {
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { decodePng } from './png.mjs';
+import { jpgMask, pngMask } from './mask.mjs';
 import { parseFmp, markersOf } from './fmp.mjs';
 
 const SRC = path.resolve('..', 'X85-devcore 2');
@@ -26,55 +26,6 @@ function walk(dir) {
     if (e.isDirectory()) out.push(...walk(p)); else out.push(p);
   }
   return out.sort();
-}
-
-// ---- masks -------------------------------------------------------------------------------------
-function packMask(w, h, solidAt) {
-  const wpr = Math.ceil(w / 32);
-  const words = new Uint32Array(2 + wpr * h);
-  words[0] = w; words[1] = h;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (solidAt(x, y)) words[2 + y * wpr + (x >> 5)] |= (1 << (x & 31)) >>> 0;
-    }
-  }
-  return Buffer.from(words.buffer);
-}
-
-function pngMask(buf) {
-  const { width, height, rgba } = decodePng(buf);
-  return {
-    w: width, h: height,
-    mask: packMask(width, height, (x, y) => {
-      const i = (y * width + x) * 4;
-      let r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
-      const a = rgba[i + 3];
-      if (r === 255 && g === 0 && b === 255 && a === 255) { r = 0; g = 0; b = 0; } // PontoTransparente
-      return (r | g | b | a) !== 0;
-    }),
-  };
-}
-
-function jpgSize(buf) {
-  if (buf[0] !== 0xff || buf[1] !== 0xd8) throw new Error('jpg: bad SOI');
-  let p = 2;
-  while (p + 4 <= buf.length) {
-    if (buf[p] !== 0xff) { p++; continue; }
-    const m = buf[p + 1];
-    if (m === 0xff) { p++; continue; }
-    if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { p += 2; continue; }
-    const len = buf.readUInt16BE(p + 2);
-    if (m === 0xc0 || m === 0xc1 || m === 0xc2) {
-      return { h: buf.readUInt16BE(p + 5), w: buf.readUInt16BE(p + 7) };
-    }
-    p += 2 + len;
-  }
-  throw new Error('jpg: no SOF marker');
-}
-
-function jpgMask(buf) {
-  const { w, h } = jpgSize(buf);
-  return { w, h, mask: packMask(w, h, () => true) };
 }
 
 // ---- main --------------------------------------------------------------------------------------
