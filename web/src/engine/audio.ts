@@ -21,7 +21,7 @@ export interface AudioPort {
 
 // orig: SDL_mixer default channel count (Mix_AllocateChannels is never called)
 const MAX_CANAIS = 8;
-// orig: chienaudio2.h CA2_ESQUERDA / CA2_DIREITA
+// orig: chienaudio2.h:31-32 CA2_ESQUERDA / CA2_DIREITA
 const CA2_ESQUERDA = -100, CA2_DIREITA = 100;
 // orig: SDL_mixer MIX_MAX_VOLUME
 const MIX_MAX_VOLUME = 128;
@@ -85,7 +85,7 @@ export function desbloqueiaAudio(): Promise<void> {
   return porta ? porta.desbloqueia().catch(() => undefined) : Promise.resolve();
 }
 
-// orig: chienaudio2.cpp:177 CA2_CarregaEfeito — 1-based id in load order, cached by path; 0 if the file is unknown
+// orig: chienaudio2.cpp:178 CA2_CarregaEfeito — 1-based id in load order, cached by path; 0 if the file is unknown
 export function CA2_CarregaEfeito(path: string): number {
   const chave = normaliza(path);
   const i = efeitos.indexOf(chave);
@@ -123,7 +123,7 @@ export function CA2_TocaEfeitoTela(id: number, x: number): number {
   return toca(id, Math.trunc((200 * p) / 800) - 100);
 }
 
-// orig: chienaudio2.cpp:362 CA2_CarregaMusica — 1-based id, cached by path; 0 if unknown
+// orig: chienaudio2.cpp:370 CA2_CarregaMusica — 1-based id, cached by path; 0 if unknown
 export function CA2_CarregaMusica(path: string): number {
   const chave = normaliza(path);
   const i = musicas.indexOf(chave);
@@ -135,7 +135,7 @@ export function CA2_CarregaMusica(path: string): number {
   return musicas.length;
 }
 
-// orig: chienaudio2.cpp:452 CA2_TocaMusica — Mix_PlayMusic: stop current, restart from 0, loop forever when vezes == -1
+// orig: chienaudio2.cpp:472 CA2_TocaMusica — Mix_PlayMusic: stop current, restart from 0, loop forever when vezes == -1
 export function CA2_TocaMusica(id: number, vezes: number): void {
   const chave = musicas[id - 1];
   const e = chave === undefined ? undefined : musicasManifest.get(chave);
