@@ -3,7 +3,7 @@
 Porte para navegador do X85 (versão de agosto de 2010, `X85-devcore 2/`): TypeScript, WebGL2, Web Audio, sem dependências em
 tempo de execução. Para a história do jogo, controles e créditos, veja o [README da raiz](../README.md).
 
-Jogo online: (link após o deploy). Mudanças deliberadas em relação ao original: [`FIXES.md`](FIXES.md).
+Jogo online: https://x85-game.netlify.app. Mudanças deliberadas em relação ao original: [`FIXES.md`](FIXES.md).
 
 ## Comandos
 

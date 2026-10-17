@@ -4,7 +4,7 @@ Um jogo de nave (shoot'em up espacial) feito na faculdade, em C++ com a engine C
 A versão de 2010 foi premiada em dois eventos de jogos independentes. Este repositório guarda o código-fonte original
 (2009 e 2010) e uma **versão para navegador** do jogo de 2010 (TypeScript, WebGL2 e Web Audio), jogável no desktop e no celular.
 
-Jogue online: (link após o deploy)
+Jogue online: **https://x85-game.netlify.app**
 
 ## História
 
