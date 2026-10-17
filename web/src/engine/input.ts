@@ -165,8 +165,7 @@ function padMask(p: Gamepad): number {
 
 /** Diff the OR of all connected pads against `prev.mask` and push down/up events. */
 export function pollGamepads(e: Entrada, pads: (Gamepad | null)[], prev: { mask: number }): void {
-  let mask = 0;
-  for (const p of pads) if (p) mask |= padMask(p);
+  const mask = maskTodos(pads);
   const diff = mask ^ prev.mask;
   if (diff) {
     for (let i = 0; i < PAD_TECLAS.length; i++) {
@@ -174,4 +173,54 @@ export function pollGamepads(e: Entrada, pads: (Gamepad | null)[], prev: { mask:
     }
   }
   prev.mask = mask;
+}
+
+/** OR of the masks of all connected pads. */
+function maskTodos(pads: (Gamepad | null)[]): number {
+  let mask = 0;
+  for (const p of pads) if (p) mask |= padMask(p);
+  return mask;
+}
+
+// mask bits that resume the pause overlay: A/RT, B, LB/RB, Start (directions never do)
+const PAD_GESTO = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7);
+
+/**
+ * D10 (web addition): the gamepad state of main.ts. `poll` feeds the game; on focus loss `ressincroniza` forgets the
+ * held state (the blur releaseAll released every key) so still-held buttons are pressed again by the next poll; while
+ * the game is paused `gestoPausa` watches the pads without feeding the game, so gamepad-only players can resume.
+ */
+export class ControlePads {
+  private readonly jogo = { mask: 0 };
+  private readonly emPausa = { mask: 0 };
+
+  poll(e: Entrada, pads: (Gamepad | null)[]): void { pollGamepads(e, pads, this.jogo); }
+
+  ressincroniza(): void { this.jogo.mask = 0; }
+
+  /** Entering the pause: buttons already held do not count as a resume gesture. */
+  pausa(pads: (Gamepad | null)[]): void { this.emPausa.mask = maskTodos(pads); }
+
+  /** While paused: the gesture bits newly pressed since the last call (0 = keep paused). */
+  gestoPausa(pads: (Gamepad | null)[]): number {
+    const mask = maskTodos(pads);
+    const novos = mask & ~this.emPausa.mask & PAD_GESTO;
+    this.emPausa.mask = mask;
+    return novos;
+  }
+
+  /**
+   * The game resumed (by `gesto` = the bits gestoPausa returned, or 0 for a key/click): every held button is
+   * pressed again on the next poll except the resume buttons, which are swallowed like the resume key.
+   */
+  retomou(gesto: number): void { this.jogo.mask = gesto; }
+}
+
+const MODIFICADORES = new Set(['AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'MetaLeft', 'MetaRight', 'ShiftLeft', 'ShiftRight']);
+
+/** Browser shortcuts (F1..F24, Ctrl/Cmd+key, Alt+key) that the start/resume gesture must not consume. */
+export function atalhoDoNavegador(ev: { code: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): boolean {
+  if (/^F\d+$/.test(ev.code)) return true;
+  if (MODIFICADORES.has(ev.code)) return false; // the modifier alone: handled by the caller's ignore list
+  return ev.ctrlKey || ev.metaKey || ev.altKey;
 }

@@ -5,9 +5,9 @@ import { WebGL2Backend, type Backend, type Quad } from './engine/renderer';
 import { initSprites } from './engine/sprites';
 import { initMapas } from './engine/mapa';
 import { carregaTudo, type Dados } from './engine/assets';
-import { Entrada, attachDom, pollGamepads } from './engine/input';
+import { Entrada, attachDom, ControlePads, atalhoDoNavegador } from './engine/input';
 import { bindEntrada } from './engine/c2d2';
-import { initAudio, criaPortaWebAudio, desbloqueiaAudio, CA2_PausaMusica, CA2_ContinuaMusica } from './engine/audio';
+import { initAudio, criaPortaWebAudio, portaOuSilenciosa, desbloqueiaAudio, CA2_PausaMusica, CA2_ContinuaMusica } from './engine/audio';
 import { PassoFixo, iniciaLoop, type Loop } from './engine/loop';
 import { encaixa, paraLogico, aplicaEncaixe, alternaTelaCheia, type Encaixe, type Margens } from './engine/viewport';
 import { g, HOTSPOT } from './game/funcoes_M';
@@ -108,11 +108,18 @@ let quadroLogico = 0;
 let fase: 'carregando' | 'pronto' | 'rodando' | 'erro' = 'carregando';
 let pausadoJogo = false;   // pause overlay during TELA_JOGO (tab hidden / focus lost)
 let musicaOculta = false;  // music paused because the tab was hidden outside the game
-const pads = { mask: 0 };
+const pads = new ControlePads();
+const lePads = (): (Gamepad | null)[] => (navigator.getGamepads ? navigator.getGamepads() : []);
 
 function passoLogico(): void {
-  if (pausadoJogo || congeladoToque || !gen || !entrada) return;
-  pollGamepads(entrada, navigator.getGamepads ? navigator.getGamepads() : [], pads);
+  if (pausadoJogo) {
+    // D10 (web addition): gamepad-only players resume with a newly pressed pad button (A / B / LB / RB / Start)
+    const gesto = pads.gestoPausa(lePads());
+    if (gesto) retomaJogo(gesto);
+    return;
+  }
+  if (congeladoToque || !gen || !entrada) return;
+  pads.poll(entrada, lePads());
   entrada.poll();
   quadroLogico++;
   let fim: boolean | undefined;
@@ -169,13 +176,16 @@ function pausaJogo(): void {
   if (fase !== 'rodando' || pausadoJogo || g.estado_atual !== TELA_JOGO) return;
   pausadoJogo = true;
   pausa.hidden = false;
+  pads.pausa(lePads()); // buttons held right now do not resume
   CA2_PausaMusica(); // Ruling R11
 }
 
-function retomaJogo(): void {
+/** `gestoPad`: the pad buttons that resumed (swallowed); 0 when resumed by a key / click / tap. */
+function retomaJogo(gestoPad = 0): void {
   if (!pausadoJogo) return;
   pausadoJogo = false;
   pausa.hidden = true;
+  pads.retomou(gestoPad); // still-held pad buttons are pressed again on the next frame
   musicaOculta = false;
   CA2_ContinuaMusica();
   if (passo && !passo.pausado) passo.retomar(performance.now()); // no catch-up for the paused time
@@ -203,6 +213,7 @@ function instalaEventos(): void {
   const gesto = (ev: Event): void => {
     if (fase === 'pronto' && naUiDoSplash(ev)) return;
     if (ev instanceof KeyboardEvent) {
+      if (atalhoDoNavegador(ev)) return; // F5 / F11 / Cmd+R / Ctrl+L …: the browser's, never the game's
       if (ev.repeat || ['Escape', 'KeyF', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'MetaLeft', 'MetaRight', 'Tab'].includes(ev.code)) return;
     }
     if (fase === 'pronto') { ev.preventDefault(); inicia(); return; }
@@ -216,15 +227,23 @@ function instalaEventos(): void {
     if (ev.code === 'KeyF' && !ev.repeat && !textoAtivo.v && !ev.ctrlKey && !ev.metaKey && !ev.altKey) void alternaTelaCheia(document.documentElement);
   });
 
-  window.addEventListener('blur', () => pausaJogo());
+  // attachDom releases every key on blur / hidden; forget the pads' held state too so a still-held button is
+  // pressed again on the next poll instead of staying released (D10)
+  window.addEventListener('blur', () => { pads.ressincroniza(); pausaJogo(); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
+      pads.ressincroniza();
       if (fase === 'rodando' && g.estado_atual === TELA_JOGO) pausaJogo();
       else if (fase === 'rodando' && !pausadoJogo) { CA2_PausaMusica(); musicaOculta = true; }
     } else if (musicaOculta && !pausadoJogo) {
       musicaOculta = false;
       CA2_ContinuaMusica();
     }
+  });
+
+  // D10 (web addition): an accidental Ctrl+W / Cmd+W / reload during a mission asks for confirmation first
+  window.addEventListener('beforeunload', ev => {
+    if (fase === 'rodando' && g.estado_atual === TELA_JOGO) { ev.preventDefault(); ev.returnValue = true; } // returnValue: legacy browsers
   });
 
   tela.addEventListener('contextmenu', ev => ev.preventDefault()); // R12c
@@ -276,7 +295,8 @@ async function boot(): Promise<void> {
   }
   initSprites(contador, dados);
   initMapas(dados);
-  void initAudio(criaPortaWebAudio('./'), dados.manifest);
+  // no / blocked AudioContext: play silently rather than hang at "Carregando… 100%"
+  void initAudio(portaOuSilenciosa(() => criaPortaWebAudio('./')), dados.manifest);
   fase = 'pronto';
   mostraSplash('Clique / toque para começar', true);
 }

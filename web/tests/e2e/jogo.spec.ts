@@ -70,6 +70,12 @@ test('gameplay: fire, bomb (X), weapon (Z); hidden tab pauses without catch-up; 
   await anexa(page, info, 'weapon-info');
   expect(await estado(page)).toBe(TELA.JOGO);
   expect(await page.evaluate(() => window.__x85!.quads())).toBeGreaterThan(50);
+  // D10: during a mission an accidental Ctrl+W / Cmd+W / reload must ask first (beforeunload guard armed)
+  expect(await page.evaluate(() => {
+    const ev = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  })).toBe(true);
 
   // the logic runs at a fixed 60 Hz whatever the render rate (PassoFixo): ~120 frames in 2 s
   {
@@ -108,6 +114,28 @@ test('gameplay: fire, bomb (X), weapon (Z); hidden tab pauses without catch-up; 
   const df = (await quadro(page)) - f1, dt = Date.now() - t0;
   expect(df).toBeGreaterThan(0);
   expect(df).toBeLessThanOrEqual(Math.ceil((dt * 60) / 1000) + 6); // no catch-up of the ~1.5 s spent paused
+  expect(await estado(page)).toBe(TELA.JOGO);
+
+  // D10: a gamepad-only player resumes with a pad button; Start (= Esc in game) is swallowed, so the mission goes on
+  await page.evaluate(() => {
+    const w = window as unknown as { __botoes: number[] };
+    w.__botoes = [];
+    const pad = () => ({ connected: true, axes: [0, 0, 0, 0],
+      buttons: Array.from({ length: 17 }, (_, i) => ({ pressed: w.__botoes.includes(i), touched: false, value: w.__botoes.includes(i) ? 1 : 0 })) });
+    Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad()] });
+  });
+  const botoes = (b: number[]) => page.evaluate(v => { (window as unknown as { __botoes: number[] }).__botoes = v; }, b);
+  await visibilidade(page, true);
+  await visibilidade(page, false);
+  await expect(page.locator('#pausa')).toBeVisible();
+  await page.waitForTimeout(200);
+  await botoes([9]);
+  await expect(page.locator('#pausa')).toBeHidden();
+  await page.waitForTimeout(200);
+  await botoes([]);
+  const f2 = await quadro(page);
+  await page.waitForTimeout(600);
+  expect(await quadro(page)).toBeGreaterThan(f2 + 20);
   expect(await estado(page)).toBe(TELA.JOGO);
 
   expect(erros).toEqual([]);

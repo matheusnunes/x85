@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { Entrada, K, codeToKeys, attachDom, pollGamepads } from '../../src/engine/input';
+import { Entrada, K, codeToKeys, attachDom, pollGamepads, ControlePads, atalhoDoNavegador } from '../../src/engine/input';
 
 test('press edge lasts one poll', () => {
   const e = new Entrada(); e.push({ t: 'down', k: K.ESPACO }); e.poll();
@@ -161,4 +161,47 @@ test('gamepad: stick/dpad/buttons diff into down/up', () => {
   expect(e.teclas[K.CIMA].ativo).toBe(true); expect(e.teclas[K.DIREITA].ativo).toBe(true);
   pollGamepads(e, [], prev); e.poll();
   expect(e.teclas[K.CIMA].ativo).toBe(false);
+});
+
+test('gamepad: after a blur releaseAll, ressincroniza() makes a still-held button press again (D10)', () => {
+  const e = new Entrada(); const c = new ControlePads();
+  c.poll(e, [pad([0], [-0.8, 0, 0, 0])]); e.poll();
+  expect(e.teclas[K.ESPACO].ativo).toBe(true); expect(e.teclas[K.ESQUERDA].ativo).toBe(true);
+  e.push({ t: 'releaseAll' }); c.ressincroniza();          // window blur (attachDom) + main.ts re-sync
+  c.poll(e, [pad([0], [-0.8, 0, 0, 0])]); e.poll();         // still held
+  expect(e.teclas[K.ESPACO].ativo).toBe(true); expect(e.teclas[K.ESQUERDA].ativo).toBe(true);
+  // without the re-sync the held button would stay released until pressed again
+  const e2 = new Entrada(); const prev = { mask: 0 };
+  pollGamepads(e2, [pad([0])], prev); e2.poll(); e2.push({ t: 'releaseAll' });
+  pollGamepads(e2, [pad([0])], prev); e2.poll();
+  expect(e2.teclas[K.ESPACO].ativo).toBe(false);
+});
+
+test('gamepad: while paused a newly pressed button (not a direction, not one held at pause) resumes; it is swallowed (D10)', () => {
+  const e = new Entrada(); const c = new ControlePads();
+  c.poll(e, [pad([1], [0, -0.8, 0, 0])]); e.poll();          // B (LCTRL) + up held when the game pauses
+  e.push({ t: 'releaseAll' }); c.ressincroniza();
+  c.pausa([pad([1], [0, -0.8, 0, 0])]);
+  expect(c.gestoPausa([pad([1], [0, -0.8, 0, 0])])).toBe(0); // held since before the pause: no resume
+  expect(c.gestoPausa([pad([1], [0.9, -0.8, 0, 0])])).toBe(0); // a direction never resumes
+  expect(c.gestoPausa([])).toBe(0);                          // released...
+  const novos = c.gestoPausa([pad([9], [0, -0.8, 0, 0])]);   // ...Start pressed: resume
+  expect(novos).not.toBe(0);
+  c.retomou(novos);
+  c.poll(e, [pad([9], [0, -0.8, 0, 0])]); e.poll();
+  expect(e.teclas[K.CIMA].ativo).toBe(true);                 // still-held direction re-pressed
+  expect(e.teclas[K.ESC].pressionado).toBe(false);           // the resume button does not reach the game
+  c.pausa([pad([0])]); expect(c.gestoPausa([pad([0, 9])])).not.toBe(0);
+  c.retomou(0); c.poll(e, [pad([0])]); e.poll();             // resumed by key/click: held A pressed again
+  expect(e.teclas[K.ESPACO].pressionado).toBe(true);
+});
+
+test('browser shortcuts are recognised so the start/resume gesture leaves them alone', () => {
+  const k = (code: string, m: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey', boolean>> = {}) =>
+    ({ code, ctrlKey: false, metaKey: false, altKey: false, ...m });
+  for (const ev of [k('F11'), k('F5'), k('F1'), k('F12'), k('KeyR', { metaKey: true }), k('KeyR', { ctrlKey: true }),
+    k('KeyL', { metaKey: true }), k('KeyW', { ctrlKey: true }), k('ArrowLeft', { altKey: true }), k('Tab', { altKey: true })])
+    expect(atalhoDoNavegador(ev)).toBe(true);
+  for (const ev of [k('Space'), k('Enter'), k('KeyA'), k('ArrowLeft'), k('AltLeft', { altKey: true }), k('ControlLeft', { ctrlKey: true }), k('MetaLeft', { metaKey: true })])
+    expect(atalhoDoNavegador(ev)).toBe(false);
 });
