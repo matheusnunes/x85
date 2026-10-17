@@ -1,0 +1,23 @@
+# OS / editors
+.DS_Store
+*~
+
+# Original build artefacts (binaries are archived locally, not in git)
+*.o
+**/bin/
+**/obj/
+betaversion/teste
+*.depend
+*.layout
+
+# Redundant June-2010 snapshot (superseded by "X85-devcore 2")
+/X85-devcore/
+
+# Analysis scratch
+docs/analysis/tools/__pycache__/
+
+# Web build
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
