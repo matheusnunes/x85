@@ -8,7 +8,7 @@ import { dadosDeTeste } from './fixture';
 import * as J from '../../src/game/funcoes_J';
 import { novoNave, novaExplo } from '../../src/game/tipos';
 import { MAXEXPLOS, INVALIDO, X85 } from '../../src/game/constantes';
-import { deltaParaAlvo, Sequenciador, difTexto, AutoTiro, autoTiroLigado, armaInativa } from '../../src/touch/touch';
+import { deltaParaAlvo, Sequenciador, difTexto, AutoTiro, autoTiroLigado, armaInativa, viraArrasto } from '../../src/touch/touch';
 
 // --- deltaParaAlvo ---------------------------------------------------------------------------------
 test('deltaParaAlvo converts a CSS-px finger delta to logical px', () => {
@@ -210,6 +210,15 @@ test('auto-fire is on only with the touch UI active, in the gameplay loop, no di
   expect(autoTiroLigado({ ...base, partida: false })).toBe(false);        // menus, ready screen
   expect(autoTiroLigado({ ...base, confirmaAberto: true })).toBe(false);  // "Voltar ao menu?" open
   expect(autoTiroLigado({ ...base, esc: true })).toBe(false);             // leaving: no press may reach the next screen
+});
+
+test('the finger that dismissed "ready" steers once gameplay runs, never while the ⏸ dialog is open', () => {
+  const base = { jogo: true, partida: true, confirmaAberto: false, arrastando: false };
+  expect(viraArrasto(base)).toBe(true);
+  expect(viraArrasto({ ...base, confirmaAberto: true })).toBe(false); // logic frozen: no moveAlvoToque
+  expect(viraArrasto({ ...base, partida: false })).toBe(false);       // still on the ready screen
+  expect(viraArrasto({ ...base, jogo: false })).toBe(false);
+  expect(viraArrasto({ ...base, arrastando: true })).toBe(false);     // another finger already steers
 });
 
 test('ARMA looks inactive while fewer than 2 weapons are unlocked', () => {

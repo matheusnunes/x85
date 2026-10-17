@@ -35,6 +35,12 @@ export function autoTiroLigado(s: { toque: boolean; partida: boolean; confirmaAb
   return s.toque && s.partida && !s.confirmaAberto && !s.esc;
 }
 
+/** Pure: the finger that dismissed "ready" (a left click) turns into the steering finger once the gameplay loop
+ * runs — unless another finger already steers or the ⏸ dialog is open (logic frozen: no nudge may queue). */
+export function viraArrasto(s: { jogo: boolean; partida: boolean; confirmaAberto: boolean; arrastando: boolean }): boolean {
+  return s.jogo && s.partida && !s.confirmaAberto && !s.arrastando;
+}
+
 /** Pure: ARMA (weapon cycle) can only change the weapon with at least two unlocked. */
 export function armaInativa(liberadas: number): boolean { return liberadas < 2; }
 
@@ -344,7 +350,8 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
       if ((ix !== 0 || iy !== 0) && o.emJogo()) moveAlvoToque(ix, iy);
       resto.x -= ix; resto.y -= iy;
     } else if (ev.pointerId === toqueMenu) {
-      if (o.emJogo() && emPartida() && arrasto === null) { // the finger that dismissed "ready" goes on steering
+      // the finger that dismissed "ready" goes on steering — not while the "back to menu?" dialog freezes the logic
+      if (viraArrasto({ jogo: o.emJogo(), partida: emPartida(), confirmaAberto: !confirma.hidden, arrastando: arrasto !== null })) {
         soltaMenu();
         comecaArrasto(ev);
         return;
