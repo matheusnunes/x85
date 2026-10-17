@@ -49,42 +49,66 @@ function obtemStore(store: Storage | null | undefined): Storage | null {
 }
 
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const nome = (v: unknown): string | null => (typeof v === 'string' ? v.slice(0, NOME_MAX) : null);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** C int store of a JSON number: truncated toward zero, clamped to [lo, hi]. */
+const inteiro = (v: number, lo: number, hi: number) => clamp(Math.trunc(v), lo, hi) | 0;
+
+// orig: funcoes_M.h enum {EASY=1, NORMAL, HARD, GODMODE}; 5 planets (planeta 0..4, jogo.cpp planeta_liberado < 4)
+const LEVEL_MIN = 1, LEVEL_MAX = 4, PLANETA_MAX = 4;
+const PTS_MAX = 0x7fffffff;
 
 function validaSave(v: unknown): TipoSave | null {
   if (!isRec(v)) return null;
   const n = nome(v.nome);
-  if (typeof v.empty !== 'boolean' || !isInt(v.pts) || n === null || !isInt(v.level) ||
-      !isInt(v.planeta_liberado) || !isInt(v.planeta_atual)) return null;
+  if (typeof v.empty !== 'boolean' || !isNum(v.pts) || n === null || !isNum(v.level) ||
+      !isNum(v.planeta_liberado) || !isNum(v.planeta_atual)) return null;
   const t = v.tiro_liberado;
   if (!Array.isArray(t) || t.length !== 6 || !t.every(x => typeof x === 'boolean')) return null;
-  return { empty: v.empty, pts: v.pts | 0, nome: n, level: v.level | 0,
-    planeta_liberado: v.planeta_liberado | 0, planeta_atual: v.planeta_atual | 0, tiro_liberado: [...t] as boolean[] };
+  return { empty: v.empty, pts: inteiro(v.pts, -PTS_MAX - 1, PTS_MAX), nome: n, level: inteiro(v.level, LEVEL_MIN, LEVEL_MAX),
+    planeta_liberado: inteiro(v.planeta_liberado, 0, PLANETA_MAX), planeta_atual: inteiro(v.planeta_atual, 0, PLANETA_MAX),
+    tiro_liberado: [...t] as boolean[] };
 }
 
 function validaRecorde(v: unknown): TipoRecorde | null {
   if (!isRec(v)) return null;
   const n = nome(v.nome);
-  if (n === null || !isInt(v.pts)) return null;
-  return { nome: n, pts: v.pts | 0 };
+  if (n === null || !isNum(v.pts)) return null;
+  return { nome: n, pts: inteiro(v.pts, -PTS_MAX - 1, PTS_MAX) };
 }
 
+/** Saves: a wrong-length array falls back to the 3 default slots; inside a valid array each bad slot falls back alone. */
+function validaSaves(v: unknown): TipoSave[] {
+  const def = savesDefault();
+  if (!Array.isArray(v) || v.length !== 3) return def;
+  return v.map((s, i) => validaSave(s) ?? def[i]);
+}
+
+/** Records: all-or-nothing (the ranking is one sorted table; mixing in default rows could break its order). */
+function validaRecordes(v: unknown): TipoRecorde[] {
+  if (!Array.isArray(v) || v.length !== 7) return recordesDefault();
+  const r: TipoRecorde[] = [];
+  for (const x of v) { const ok = validaRecorde(x); if (!ok) return recordesDefault(); r.push(ok); }
+  return r;
+}
+
+function validaOpcoes(v: unknown): Opcoes {
+  const def = padrao().opcoes;
+  if (!isRec(v)) return def;
+  return {
+    volume_music: isNum(v.volume_music) ? inteiro(v.volume_music, 0, 100) : def.volume_music,
+    volume_effects: isNum(v.volume_effects) ? inteiro(v.volume_effects, 0, 100) : def.volume_effects,
+  };
+}
+
+/** D10 (web addition): per-section fallback — a corrupt section never wipes the others. Unknown version → null. */
 function valida(v: unknown): Persistido | null {
   if (!isRec(v) || v.versao !== 1) return null;
-  if (!Array.isArray(v.saves) || v.saves.length !== 3) return null;
-  if (!Array.isArray(v.recordes) || v.recordes.length !== 7) return null;
-  if (!isRec(v.opcoes) || !isInt(v.opcoes.volume_music) || !isInt(v.opcoes.volume_effects)) return null;
-  const saves: TipoSave[] = [];
-  for (const s of v.saves) { const r = validaSave(s); if (!r) return null; saves.push(r); }
-  const recordes: TipoRecorde[] = [];
-  for (const s of v.recordes) { const r = validaRecorde(s); if (!r) return null; recordes.push(r); }
-  return { versao: 1, saves, recordes,
-    opcoes: { volume_music: clamp(v.opcoes.volume_music | 0, 0, 100), volume_effects: clamp(v.opcoes.volume_effects | 0, 0, 100) } };
+  return { versao: 1, saves: validaSaves(v.saves), recordes: validaRecordes(v.recordes), opcoes: validaOpcoes(v.opcoes) };
 }
 
-/** Loads persisted data; any failure (no storage, denied, corrupt, wrong shape) yields the defaults. */
+/** Loads persisted data; no storage / denied / unparsable JSON / unknown version → defaults; a bad section → its defaults. */
 export function carrega(store?: Storage | null): Persistido {
   try {
     const s = obtemStore(store);

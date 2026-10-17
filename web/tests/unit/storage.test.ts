@@ -34,7 +34,7 @@ test('wrong shapes → defaults', () => {
     null, 5, 'x', [], {}, { versao: 2, saves: [], recordes: [], opcoes: {} },
     { ...padrao(), saves: padrao().saves.slice(0, 2) },
     { ...padrao(), recordes: padrao().recordes.slice(0, 6) },
-    { ...padrao(), opcoes: { volume_music: 'a', volume_effects: 3 } },
+    { ...padrao(), opcoes: { volume_music: 'a', volume_effects: null } },
     { ...padrao(), saves: [{ ...padrao().saves[0], tiro_liberado: [true] }, padrao().saves[1], padrao().saves[2]] },
     { ...padrao(), recordes: [{ nome: 5, pts: 1 }, ...padrao().recordes.slice(1)] },
   ];
@@ -48,4 +48,41 @@ test('names are cut to 14 chars and volumes clamped on load', () => {
   const r = carrega(s);
   expect(r.saves[0].nome).toBe('abcdefghijklmn'); expect(r.recordes[0].nome.length).toBe(14);
   expect(r.opcoes).toEqual({ volume_music: 100, volume_effects: 0 });
+});
+
+test('out-of-range / fractional save fields are clamped and truncated (planeta 0..4, level 1..4)', () => {
+  const s = mem(); const p = padrao() as unknown as { saves: Record<string, unknown>[] };
+  p.saves[0] = { ...p.saves[0], empty: false, nome: 'a', planeta_atual: 9, planeta_liberado: -3, level: 0, pts: 12.9 };
+  p.saves[1] = { ...p.saves[1], empty: false, nome: 'b', planeta_atual: 2.7, planeta_liberado: 4.99, level: 7 };
+  p.saves[2] = { ...p.saves[2], empty: false, nome: 'c', planeta_atual: -0.5, planeta_liberado: 3, level: 2.5 };
+  s.setItem(CHAVE, JSON.stringify(p));
+  const r = carrega(s).saves;
+  expect([r[0].planeta_atual, r[0].planeta_liberado, r[0].level, r[0].pts]).toEqual([4, 0, 1, 12]);
+  expect([r[1].planeta_atual, r[1].planeta_liberado, r[1].level]).toEqual([2, 4, 4]);
+  expect([r[2].planeta_atual, r[2].planeta_liberado, r[2].level]).toEqual([0, 3, 2]);
+  expect(r.map(x => x.nome)).toEqual(['a', 'b', 'c']);
+});
+test('a corrupt records array keeps valid saves and options (per-field fallback)', () => {
+  const s = mem(); const p = padrao();
+  p.saves[1] = { ...p.saves[1], empty: false, nome: 'argus', pts: 134500, planeta_liberado: 2, planeta_atual: 1 };
+  p.opcoes = { volume_music: 70, volume_effects: 10 };
+  s.setItem(CHAVE, JSON.stringify({ ...p, recordes: [{ nome: 5, pts: 'x' }, ...p.recordes.slice(1)] }));
+  const r = carrega(s);
+  expect(r.recordes).toEqual(padrao().recordes);
+  expect(r.saves[1]).toEqual(p.saves[1]);
+  expect(r.opcoes).toEqual({ volume_music: 70, volume_effects: 10 });
+});
+test('an invalid saves array keeps records and options; a single bad slot falls back alone', () => {
+  const p = padrao(); p.recordes[0] = { nome: 'campeao', pts: 99999 }; p.opcoes = { volume_music: 55, volume_effects: 44 };
+  p.saves[0] = { ...p.saves[0], empty: false, nome: 'ok0' }; p.saves[2] = { ...p.saves[2], empty: false, nome: 'ok2' };
+  const s1 = mem(); s1.setItem(CHAVE, JSON.stringify({ ...p, saves: 'lixo' }));
+  const r1 = carrega(s1);
+  expect(r1.saves).toEqual(padrao().saves); expect(r1.recordes[0]).toEqual({ nome: 'campeao', pts: 99999 });
+  expect(r1.opcoes).toEqual({ volume_music: 55, volume_effects: 44 });
+  const s2 = mem(); s2.setItem(CHAVE, JSON.stringify({ ...p, saves: [p.saves[0], { lixo: true }, p.saves[2]] }));
+  const r2 = carrega(s2);
+  expect(r2.saves.map(x => x.nome)).toEqual(['ok0', 'new', 'ok2']); expect(r2.saves[1]).toEqual(padrao().saves[1]);
+  const s3 = mem(); s3.setItem(CHAVE, JSON.stringify({ ...p, opcoes: { volume_music: 'a', volume_effects: 44 } }));
+  expect(carrega(s3).opcoes).toEqual({ volume_music: 30, volume_effects: 44 });
+  expect(carrega(s3).recordes[0].nome).toBe('campeao');
 });
