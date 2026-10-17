@@ -7,6 +7,7 @@ import {
   CREDITOS, paginaAbout,
 } from '../../src/game/menu';
 import { K } from '../../src/engine/input';
+import { C2D2_CarregaFonte, larguraTexto } from '../../src/engine/font';
 import { TELA_MAIN, TELA_SLOT_SELECT, TELA_SLOT_INSERT, TELA_MISSION, TELA_OPCOES, TELA_RANKING, TELA_ABOUT, TELA_JOGO, SAIR, EASY, HARD } from '../../src/game/constantes';
 
 let h: ReturnType<typeof initHeadless>;
@@ -274,6 +275,15 @@ test('about: credits page (D10, R19) — the original art first; panel click / S
   expect(paginaAbout.v).toBe(1);
   expect(q.some(x => x.tex === about1 || x.tex === about2)).toBe(false);
   CREDITOS.forEach((linha, i) => { if (linha) expect(texto(q, 112 + 37 * i)).toBe(linha); });
+  // the 2010 team as on about1.png, plus the web version; every line fits the panel (x 80..775) at size 32
+  expect(texto(q, 112 + 37 * 1) + ' ' + texto(q, 112 + 37 * 2)).toBe('X85 (2010): Christian Isenberg, Diego Lopes Simioni, Matheus Gobato Nunes');
+  expect(CREDITOS).toContain('Versão web (2026): Matheus Gobato Nunes');
+  const fonte = C2D2_CarregaFonte('./dados/menu/512.png', 32);
+  for (const linha of CREDITOS) {
+    const w = larguraTexto(fonte, linha), x0 = 427 - Math.trunc(w / 2);
+    expect(x0, linha).toBeGreaterThanOrEqual(80 + 8); expect(x0 + w, linha).toBeLessThanOrEqual(775 - 8);
+  }
+  expect(112 + 37 * (CREDITOS.length - 1) + 32).toBeLessThanOrEqual(488); // last line clear of the page hint
   expect(CREDITOS).toContain('newgrounds.com/audio/listen/348628');
   expect(CREDITOS).toContain('newgrounds.com/audio/listen/347665');
   expect(texto(q, 488)).toBe('< sobre');

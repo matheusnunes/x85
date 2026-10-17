@@ -330,15 +330,15 @@ export function* menu_ranking(): Tela {
 // Drawn with the menu font (512.png, size 32 — it has the Latin-1 accented glyphs) over the same background.
 export const CREDITOS: readonly string[] = [
   'CRÉDITOS',
-  'X85 (2010) - Matheus Gobato Nunes',
-  '',
+  'X85 (2010): Christian Isenberg,', // the 2010 team, in about1.png's order (split to fit the panel)
+  'Diego Lopes Simioni, Matheus Gobato Nunes',
   'Música do menu: Recharge - alvys18',
   'newgrounds.com/audio/listen/348628',
   'Música do jogo: Esprit - SasquaMox',
   'newgrounds.com/audio/listen/347665',
   '(CC BY-NC 3.0)',
   'Engine original: Chien2D 2',
-  'Versão web: 2026',
+  'Versão web (2026): Matheus Gobato Nunes',
 ];
 // web: the framed panel of the about screen (inside cover.png, right of the back button botback at x 8..73),
 // where a click switches pages; credits are centred in it

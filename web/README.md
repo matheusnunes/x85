@@ -74,8 +74,8 @@ converte o áudio e escreve `manifest.json`. A saída é **versionada no git**, 
 
 - O áudio vai para Ogg (a origem) e AAC `.m4a` (para o Safari/iOS). O `.m4a` é criado com `afconvert`, que só existe no macOS;
   sem ele o script mantém os `.m4a` já commitados, e a saída do `afconvert` não é determinística, então reexecuções reaproveitam os arquivos existentes.
-- Os arquivos não têm hash no nome. O build copia `public/` para `dist/assets/` e a Netlify serve esse diretório com `max-age=86400`
-  (veja `../netlify.toml`); só os bundles de JS/CSS do Vite (`dist/bundle/`) são `immutable`.
+- Os arquivos não têm hash no nome. O build copia `public/` para `dist/assets/` e a Netlify serve `dist/assets/dados/` com `max-age=86400`
+  e o índice `assets/manifest.json` com `no-cache` (veja `../netlify.toml`); só os bundles de JS/CSS do Vite (`dist/bundle/`) são `immutable`.
 
 ## Testes
 
@@ -87,4 +87,5 @@ converte o áudio e escreve `manifest.json`. A saída é **versionada no git**, 
 ## Deploy
 
 A Netlify usa o `netlify.toml` da raiz do repositório (`base = "web"`, `npm run build`, publica `dist/`) e define os cabeçalhos de cache
-e a Content-Security-Policy (`default-src 'self'`, estilos inline permitidos pelo bloco `<style>` do `index.html`, nenhum script inline).
+e a Content-Security-Policy (`default-src 'self'`, estilos inline permitidos pelo bloco `<style>` do `index.html`, nenhum script inline),
+além de uma `Permissions-Policy` que desliga câmera, microfone, geolocalização, pagamento e USB (gamepad e tela cheia continuam permitidos).

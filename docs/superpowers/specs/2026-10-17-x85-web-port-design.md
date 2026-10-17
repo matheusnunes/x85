@@ -60,7 +60,7 @@ web/
       loop.ts          fixed 60 Hz accumulator stepping generator-based screens; render once per rAF
       rand.ts          glibc rand()/srand() reimplementation
       storage.ts       localStorage persistence (versioned JSON): 3 save slots, 7 records, options
-      viewport.ts      800×600 logical canvas, DPR-aware, letterbox fit, fullscreen, orientation
+      viewport.ts      800×600 logical canvas (CSS-scaled), letterbox fit, fullscreen, orientation
     game/              ← 1:1 translation, original Portuguese names kept for traceability
       main.ts          state machine (TELA_MAIN … TELA_JOGO)
       menu.ts          menu_* screens as generator functions (function* menu_main() { … yield; })
@@ -85,7 +85,7 @@ Each original blocking screen loop (`while(!encerra){ input; update; draw; C2D2_
 
 ### 4.2 Rendering
 
-All drawing goes through a single WebGL2 batch: per-frame vertex buffer of quads, one texture bind per sprite-sheet switch, draw order identical to the original. Sprite sheets keep original images (no repacking needed at this scale); the colour-key (opaque magenta → transparent) is applied at load. Canvas backing store = 800×600 × devicePixelRatio scale; the logical projection stays 800×600. Context loss is handled by re-uploading textures.
+All drawing goes through a single WebGL2 batch: per-frame vertex buffer of quads, one texture bind per sprite-sheet switch, draw order identical to the original. Sprite sheets keep original images (no repacking needed at this scale); the colour-key (opaque magenta → transparent) is applied at load. Canvas backing store stays 800×600 (the logical resolution) and is scaled to the letterboxed box via CSS (`aplicaEncaixe` sets the canvas' CSS size/position, `image-rendering:auto`); it is not multiplied by devicePixelRatio. *(Amended after implementation: the original plan was an 800×600 × devicePixelRatio backing store; the 2010 art is 800×600, so a larger store adds no detail.)* Context loss is handled by re-uploading textures.
 
 ### 4.3 Assets
 
