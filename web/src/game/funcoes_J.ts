@@ -51,7 +51,25 @@ const velocidade = 15; // orig: funcoes_J.cpp:40 static int velocidade = 15 (tar
 // Seam for external target nudges (Task 14 touch steering, `moveAlvoToque(dx, dy)`): deltas accumulated here
 // between frames are added to the ship's target (xaux/yaux) right after the keyboard step, while the ship is
 // alive, then cleared. Zero unless something writes it, so keyboard-only play is the original behaviour.
-const alvoPendente = { dx: 0, dy: 0 };
+const alvoPendente = { dx: 0, dy: 0, pendente: false };
+
+// Bounds of the target the keyboard step can produce (funcoes_J.cpp:48-55): it decrements only while
+// yaux/xaux > velocidade (→ result ≥ 1) and increments only while yaux < 600+velocidade / xaux < 800+velocidade
+// (→ result ≤ 600/800 + 2·velocidade − 1). A touch nudge is clamped to exactly this range.
+export const ALVO_MIN = 1;                           // web port (derived from funcoes_J.cpp:48,54)
+export const ALVO_MAX_X = 800 + 2 * velocidade - 1;  // web port (derived from funcoes_J.cpp:52) = 829
+export const ALVO_MAX_Y = 600 + 2 * velocidade - 1;  // web port (derived from funcoes_J.cpp:50) = 629
+
+const limita = (v: number, max: number): number => Math.min(max, Math.max(ALVO_MIN, v));
+
+/** Web addition (D10, touch steering): moves the ship's target by (dx, dy) logical px on the next player update. */
+export function moveAlvoToque(dx: number, dy: number): void {
+  if (Number.isFinite(dx)) alvoPendente.dx += dx;
+  else if (!Number.isNaN(dx)) alvoPendente.dx += dx > 0 ? ALVO_MAX_X : -ALVO_MAX_X;
+  if (Number.isFinite(dy)) alvoPendente.dy += dy;
+  else if (!Number.isNaN(dy)) alvoPendente.dy += dy > 0 ? ALVO_MAX_Y : -ALVO_MAX_Y;
+  alvoPendente.pendente = true;
+}
 
 // orig: funcoes_J.cpp:35 jogo_atualiza_jogador(Nave *jogador, Explo *explos)
 export function jogo_atualiza_jogador(jogador: Nave, explos: Explo[]): void {
@@ -71,11 +89,13 @@ export function jogo_atualiza_jogador(jogador: Nave, explos: Explo[]): void {
       jogador.xaux += velocidade;
     if ((teclado[K.ESQUERDA].pressionado || teclado[K.ESQUERDA].ativo) && jogador.xaux > velocidade)
       jogador.xaux -= velocidade;
-    // web port: external nudges (see alvoPendente)
-    jogador.xaux = (jogador.xaux + alvoPendente.dx) | 0;
-    jogador.yaux = (jogador.yaux + alvoPendente.dy) | 0;
+    // web port: external nudges (see alvoPendente), clamped to the keyboard's own target range
+    if (alvoPendente.pendente) {
+      jogador.xaux = limita(Math.trunc(jogador.xaux + alvoPendente.dx), ALVO_MAX_X) | 0;
+      jogador.yaux = limita(Math.trunc(jogador.yaux + alvoPendente.dy), ALVO_MAX_Y) | 0;
+    }
   }
-  alvoPendente.dx = 0; alvoPendente.dy = 0;
+  alvoPendente.dx = 0; alvoPendente.dy = 0; alvoPendente.pendente = false;
 
   //atualiza
   if (jogador.x < jogador.xaux && jogador.x < 720)

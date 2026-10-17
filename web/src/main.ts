@@ -10,10 +10,11 @@ import { bindEntrada } from './engine/c2d2';
 import { initAudio, criaPortaWebAudio, desbloqueiaAudio, CA2_PausaMusica, CA2_ContinuaMusica } from './engine/audio';
 import { PassoFixo, iniciaLoop, type Loop } from './engine/loop';
 import { encaixa, paraLogico, aplicaEncaixe, alternaTelaCheia, type Encaixe } from './engine/viewport';
-import { g } from './game/funcoes_M';
+import { g, HOTSPOT } from './game/funcoes_M';
 import { textoAtivo } from './game/menu';
 import { principal } from './game/principal';
 import { TELA_JOGO } from './game/constantes';
+import { initToque, reservaToque, posicionaToque } from './touch/touch';
 
 declare global {
   interface Window {
@@ -43,7 +44,7 @@ class ContaQuads implements Backend {
 }
 
 // --- layout -------------------------------------------------------------------------------------------
-let encaixe: Encaixe = encaixa(window.innerWidth, window.innerHeight);
+let encaixe: Encaixe = encaixa(window.innerWidth, window.innerHeight, reservaToque());
 
 function posicionaSobreTela(el: HTMLElement, e: Encaixe): void {
   el.style.left = `${e.esquerda}px`; el.style.top = `${e.topo}px`;
@@ -51,7 +52,7 @@ function posicionaSobreTela(el: HTMLElement, e: Encaixe): void {
 }
 
 function ajusta(): void {
-  encaixe = encaixa(palco.clientWidth || window.innerWidth, palco.clientHeight || window.innerHeight);
+  encaixe = encaixa(palco.clientWidth || window.innerWidth, palco.clientHeight || window.innerHeight, reservaToque());
   aplicaEncaixe(tela, encaixe);
   posicionaSobreTela(pausa, encaixe);
   // splash: x85.jpg (177x38) at (312,270) of the 800x600 screen, as main.cpp:16 draws it
@@ -67,6 +68,7 @@ function ajusta(): void {
   const direita = Math.max(0, window.innerWidth - (encaixe.esquerda + encaixe.largura));
   fpsEl.style.top = `max(${encaixe.topo + 4}px, env(safe-area-inset-top))`;
   fpsEl.style.right = `max(${direita + 6}px, env(safe-area-inset-right))`;
+  posicionaToque(encaixe); // touch controls (Task 14)
 }
 
 /** Client (CSS px) → logical 800x600 pixel. #palco is fixed at (0,0), but its rect is subtracted anyway (R12b). */
@@ -85,6 +87,8 @@ function mostraSplash(texto: string, pronto: boolean): void {
 let contador: ContaQuads | null = null;
 let entrada: Entrada | null = null;
 let soltaDom: (() => void) | null = null;
+let soltaToque: (() => void) | null = null;
+let congeladoToque = false; // logic frozen while the touch "back to menu?" confirmation is open
 let loop: Loop | null = null;
 let passo: PassoFixo | null = null;
 let gen: Generator<void, void, void> | null = null;
@@ -95,7 +99,7 @@ let musicaOculta = false;  // music paused because the tab was hidden outside th
 const pads = { mask: 0 };
 
 function passoLogico(): void {
-  if (pausadoJogo || !gen || !entrada) return;
+  if (pausadoJogo || congeladoToque || !gen || !entrada) return;
   pollGamepads(entrada, navigator.getGamepads ? navigator.getGamepads() : [], pads);
   entrada.poll();
   quadroLogico++;
@@ -109,6 +113,10 @@ function inicia(): void {
   entrada = new Entrada();
   bindEntrada(entrada);
   soltaDom = attachDom(entrada, window, mapaPonteiro);
+  soltaToque = initToque(document.getElementById('touch-root') as HTMLDivElement, tela, document.getElementById('texto') as HTMLInputElement, {
+    entrada, mapear: mapaPonteiro, emJogo: () => g.estado_atual === TELA_JOGO, textoAtivo: () => textoAtivo.v, hotspot: HOTSPOT,
+    relayout: ajusta, congela: sim => { congeladoToque = sim; },
+  });
   gen = principal();
   passo = new PassoFixo(passoLogico, 60);
   loop = iniciaLoop(passo, window);
@@ -118,6 +126,7 @@ function inicia(): void {
 function voltaSplash(): void {
   loop?.stop(); loop = null; passo = null; gen = null;
   soltaDom?.(); soltaDom = null;
+  soltaToque?.(); soltaToque = null;
   pausadoJogo = false; pausa.hidden = true;
   CA2_PausaMusica();
   fase = 'pronto';

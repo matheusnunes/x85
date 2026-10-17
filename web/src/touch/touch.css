@@ -1,0 +1,43 @@
+/* Touch controls (src/touch/touch.ts). Everything is hidden until the touch UI is active (.tq-on);
+   positions are set from JS in viewport px, already offset by the safe-area insets read from .tq-sonda. */
+#touch-root{position:fixed;inset:0;z-index:10;pointer-events:none;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#d8d8d8;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.tq-sonda{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.tq-painel,.tq-giro,.tq-pad,.tq-bot,.tq-dica-texto,.tq-confirma{position:fixed;display:none;box-sizing:border-box}
+
+/* portrait panel under the canvas */
+.tq.tq-on[data-modo="retrato"] .tq-painel{display:block;background:linear-gradient(#0b0b12,#000);border-top:1px solid #1f1f2a}
+.tq.tq-on[data-modo="retrato"] .tq-giro{display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:12px;line-height:1.3;opacity:.55;letter-spacing:.02em}
+
+/* drag pad hint (portrait panel / left side bar), gameplay only — the drag works anywhere outside the buttons */
+.tq.tq-on.tq-jogo:not([data-modo="sobre"]) .tq-pad{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4em;
+  border:1px dashed rgba(255,255,255,.18);border-radius:18px;font-size:12px;text-align:center;opacity:.6;padding:6px}
+
+/* buttons */
+.tq-bot{pointer-events:auto;touch-action:none;margin:0;padding:0;border-radius:50%;cursor:pointer;
+  border:2px solid rgba(255,255,255,.55);background:rgba(20,24,40,.72);color:#fff;
+  font:700 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.06em;
+  min-width:64px;min-height:64px;-webkit-tap-highlight-color:transparent;outline:none}
+.tq-bot.tq-apertado{background:rgba(200,40,40,.85);border-color:#fff;transform:scale(.94)}
+.tq-pausa{font-size:22px;border-radius:14px}
+.tq.tq-on.tq-jogo .tq-acao,.tq.tq-on.tq-jogo .tq-pausa{display:block}
+.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-acao,.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-pausa{opacity:.4}
+.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-apertado{opacity:.75}
+
+/* "tap to type" hint during name entry while the OS keyboard is closed */
+.tq.tq-digitar .tq-dica-texto{display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;
+  text-shadow:0 1px 3px #000;animation:tq-pisca 1.2s steps(2,start) infinite}
+@keyframes tq-pisca{to{visibility:hidden}}
+
+/* "back to menu?" confirmation */
+.tq-confirma{pointer-events:auto;background:rgba(0,0,0,.6);align-items:center;justify-content:center;z-index:2}
+.tq.tq-on .tq-confirma:not([hidden]){display:flex}
+.tq-caixa{background:#10131f;border:1px solid #39405a;border-radius:14px;padding:16px 18px;text-align:center;
+  box-shadow:0 8px 30px rgba(0,0,0,.6);max-width:90%}
+.tq-pergunta{font-size:18px;font-weight:700;color:#fff}
+.tq-aviso{font-size:12px;opacity:.6;margin:.35em 0 .9em}
+.tq-linha{display:flex;gap:14px;justify-content:center}
+.tq-confirma .tq-opcao{position:static;display:block;border-radius:12px;width:96px;height:64px;font-size:16px}

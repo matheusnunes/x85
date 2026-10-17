@@ -5,13 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#000000" />
   <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="X85" />
   <title>X85</title>
   <style>
     html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;
       -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     #palco{position:fixed;left:0;top:0;right:0;bottom:0;margin:0;padding:0}
     #tela{display:block;position:absolute;cursor:none;image-rendering:auto;background:#000}
-    #texto{position:fixed;left:-1000px;top:0;opacity:0;width:1px;height:1px}
+    #texto{position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;padding:0;border:0;font-size:16px;
+      pointer-events:none;caret-color:transparent;color:transparent;background:transparent}
     #splash{position:fixed;inset:0;background:#000;z-index:20;cursor:pointer;
       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#c8c8c8}
     #splash[hidden],#pausa[hidden]{display:none}
@@ -33,7 +40,7 @@
   <div id="pausa" hidden><b>PAUSA</b><span>Clique / toque ou tecle para continuar</span></div>
   <div id="splash"><img id="splash-logo" src="./assets/dados/menu/x85.jpg" alt="X85" draggable="false" /><div id="splash-texto">Carregando…</div></div>
   <div id="fps">-- fps</div>
-  <input id="texto" type="text" maxlength="14" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  <input id="texto" type="text" maxlength="14" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Nome" />
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
