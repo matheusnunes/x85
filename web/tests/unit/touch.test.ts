@@ -8,7 +8,7 @@ import { dadosDeTeste } from './fixture';
 import * as J from '../../src/game/funcoes_J';
 import { novoNave, novaExplo } from '../../src/game/tipos';
 import { MAXEXPLOS, INVALIDO, X85 } from '../../src/game/constantes';
-import { deltaParaAlvo, Sequenciador, difTexto } from '../../src/touch/touch';
+import { deltaParaAlvo, Sequenciador, difTexto, AutoTiro, autoTiroLigado, armaInativa } from '../../src/touch/touch';
 
 // --- deltaParaAlvo ---------------------------------------------------------------------------------
 test('deltaParaAlvo converts a CSS-px finger delta to logical px', () => {
@@ -161,6 +161,62 @@ test('OS-keyboard text: characters batch into one frame; each Backspace is its o
     { typed: [], bs: false },
   ]);
   expect(e.teclas[K.BACKSPACE].ativo).toBe(false);
+});
+
+// --- touch auto-fire (D10) --------------------------------------------------------------------------
+test('auto-fire: holds Space through the sequencer while on; releases when off; presses again when back on', () => {
+  const e = new Entrada(); const s = new Sequenciador(e); s.instala();
+  const a = new AutoTiro((k, baixo) => s.tecla(k, baixo));
+  let ligado = false;
+  s.aoPoll = () => a.atualiza(ligado);
+  e.poll(); expect(e.teclas[K.ESPACO].ativo).toBe(false);
+  ligado = true;
+  e.poll(); // the hook queues the down after this poll
+  expect(e.teclas[K.ESPACO].ativo).toBe(false);
+  e.poll(); expect(e.teclas[K.ESPACO]).toEqual({ pressionado: true, ativo: true, liberado: false });
+  for (let i = 0; i < 5; i++) { e.poll(); expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: true, liberado: false }); }
+  expect(a.segurando).toBe(true);
+  ligado = false;
+  e.poll(); e.poll();
+  expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  expect(a.segurando).toBe(false);
+  ligado = true;
+  e.poll(); e.poll();
+  expect(e.teclas[K.ESPACO].pressionado).toBe(true); // a fresh press edge
+});
+
+test('auto-fire: solta() releases at once (dialog / blur / uninstall) and the next update presses again', () => {
+  const e = new Entrada(); const s = new Sequenciador(e); s.instala();
+  const a = new AutoTiro((k, baixo) => s.tecla(k, baixo));
+  s.aoPoll = () => a.atualiza(true);
+  e.poll(); e.poll(); e.poll();
+  expect(e.teclas[K.ESPACO].ativo).toBe(true);
+  a.solta();
+  expect(a.segurando).toBe(false);
+  s.aoPoll = null; // frozen behind the dialog: no updates
+  e.poll();
+  expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  a.solta(); e.poll(); // releasing twice sends nothing more
+  expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: false });
+  s.aoPoll = () => a.atualiza(true); // "Não" / focus back
+  e.poll(); e.poll();
+  expect(e.teclas[K.ESPACO].pressionado).toBe(true);
+});
+
+test('auto-fire is on only with the touch UI active, in the gameplay loop, no dialog, no Esc this frame', () => {
+  const base = { toque: true, partida: true, confirmaAberto: false, esc: false };
+  expect(autoTiroLigado(base)).toBe(true);
+  expect(autoTiroLigado({ ...base, toque: false })).toBe(false);          // desktop: keyboard / mouse / gamepad only
+  expect(autoTiroLigado({ ...base, partida: false })).toBe(false);        // menus, ready screen
+  expect(autoTiroLigado({ ...base, confirmaAberto: true })).toBe(false);  // "Voltar ao menu?" open
+  expect(autoTiroLigado({ ...base, esc: true })).toBe(false);             // leaving: no press may reach the next screen
+});
+
+test('ARMA looks inactive while fewer than 2 weapons are unlocked', () => {
+  expect(armaInativa(0)).toBe(true);
+  expect(armaInativa(1)).toBe(true);
+  expect(armaInativa(2)).toBe(false);
+  expect(armaInativa(6)).toBe(false);
 });
 
 // --- difTexto ----------------------------------------------------------------------------------------

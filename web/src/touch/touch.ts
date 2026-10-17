@@ -1,8 +1,9 @@
 // Touch controls, mobile layout and OS-keyboard name entry (decision D10, spec §5.3–5.4). Web-only: nothing here
 // exists in the original; everything feeds the original input model (Entrada) so the game code stays unchanged.
 //  - Menus: a tap is the original mouse click, with the cursor hotspot (funcoes_M HOTSPOT) placed on the finger.
-//  - Gameplay: a relative drag moves the ship's target (funcoes_J moveAlvoToque) and holds fire (Space) while the
-//    finger is down; buttons BOMBA (Left Ctrl), ARMA (Left Alt) and ⏸ (confirm → Esc).
+//  - Gameplay: a relative drag moves the ship's target (funcoes_J moveAlvoToque); fire is automatic (Space held while
+//    the gameplay loop runs, AutoTiro); buttons BOMBA (Left Ctrl), ARMA (Left Alt; dimmed while only one weapon is
+//    unlocked) and ⏸ (confirm → Esc). On the ready screen a tap is a left click (it dismisses "ready", F12).
 //  - Name entry: the hidden #texto input is focused on the next tap so the OS keyboard opens; what is typed there
 //    reaches the game as `char` events and Backspace as a BACKSPACE key press.
 import './touch.css';
@@ -24,6 +25,37 @@ export interface ToqueOpts {
   relayout?: () => void;
   /** Freezes / unfreezes the logic while the "back to menu?" confirmation is open. */
   congela?: (sim: boolean) => void;
+  /** How many weapons the current save has unlocked (g.saveAtual.tiro_liberado): ARMA is dimmed below 2. */
+  armasLiberadas?: () => number;
+}
+
+/** Pure: touch auto-fire (D10) is on while the touch UI is active and the gameplay loop runs, unless the "back to
+ * menu?" dialog is open or Esc was pressed this frame (the game is leaving: a press now would reach the next screen). */
+export function autoTiroLigado(s: { toque: boolean; partida: boolean; confirmaAberto: boolean; esc: boolean }): boolean {
+  return s.toque && s.partida && !s.confirmaAberto && !s.esc;
+}
+
+/** Pure: ARMA (weapon cycle) can only change the weapon with at least two unlocked. */
+export function armaInativa(liberadas: number): boolean { return liberadas < 2; }
+
+/**
+ * Touch auto-fire (D10): keeps Space held through the sequencer. `atualiza` runs once per poll (Sequenciador.aoPoll),
+ * so a press always lands after the frame where the gameplay loop started — a fresh press, which F13 lets fire.
+ */
+export class AutoTiro {
+  private seg = false;
+  constructor(private readonly tecla: (k: K, baixo: boolean) => void) {}
+  get segurando(): boolean { return this.seg; }
+  atualiza(ligado: boolean): void {
+    if (ligado && !this.seg) { this.seg = true; this.tecla(K.ESPACO, true); }
+    else if (!ligado) this.solta();
+  }
+  /** Releases now (dialog opened, focus lost, uninstall); the next `atualiza(true)` presses again. */
+  solta(): void {
+    if (!this.seg) return;
+    this.seg = false;
+    this.tecla(K.ESPACO, false);
+  }
 }
 
 /** Pure: a finger delta in CSS px → the same distance in logical px (escala = CSS px per logical px). */
@@ -53,6 +85,8 @@ export class Sequenciador {
   private adiados: Evento[] = [];
   private fila: ItemTexto[] = [];
   private bsSegurado = false;
+  /** Runs at the end of every poll (after the sequencer's own work): touch auto-fire. */
+  aoPoll: (() => void) | null = null;
 
   constructor(private readonly e: Entrada) {}
 
@@ -84,6 +118,11 @@ export class Sequenciador {
   }
 
   private aposPoll(): void {
+    this.drenaFilas();
+    this.aoPoll?.();
+  }
+
+  private drenaFilas(): void {
     this.naoVistos.clear();
     const adiados = this.adiados;
     this.adiados = [];
@@ -157,7 +196,7 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   const painel = criaEl('div', 'tq-painel');          // portrait panel below the canvas
   const giro = criaEl('div', 'tq-giro', 'Gire o aparelho para jogar melhor');
   const pad = criaEl('div', 'tq-pad');
-  pad.append(criaEl('span', '', 'Arraste para mover'), criaEl('span', '', 'Segure para atirar'));
+  pad.append(criaEl('span', '', 'Arraste para mover'), criaEl('span', '', 'Tiro automático'));
   const bomba = criaEl('button', 'tq-bot tq-acao', 'BOMBA');
   const arma = criaEl('button', 'tq-bot tq-acao', 'ARMA');
   const pausa = criaEl('button', 'tq-bot tq-pausa', '⏸');
@@ -258,10 +297,12 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
     const p = o.mapear(cx, cy);
     return { x: p.x - o.hotspot.x, y: p.y - o.hotspot.y };
   };
-  const soltaArrasto = (): void => {
-    if (arrasto === null) return;
-    arrasto = null;
-    seq.tecla(K.ESPACO, false);
+  const soltaArrasto = (): void => { arrasto = null; };
+  const emPartida = o.emPartida ?? o.emJogo;
+  const comecaArrasto = (ev: PointerEvent): void => {
+    arrasto = ev.pointerId;
+    ultimo = { x: ev.clientX, y: ev.clientY };
+    resto.x = 0; resto.y = 0;
   };
   const soltaMenu = (): void => {
     if (toqueMenu === null) return;
@@ -282,13 +323,10 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
     if (ev.timeStamp <= t0) return;
     focaTexto();
     if (ehUi(ev.target) || !confirma.hidden) return;
-    if (o.emJogo()) {
-      if (arrasto !== null) return;
-      arrasto = ev.pointerId;
-      ultimo = { x: ev.clientX, y: ev.clientY };
-      resto.x = 0; resto.y = 0;
-      seq.tecla(K.ESPACO, true); // fire held while the finger is down
-    } else if (toqueMenu === null && noCanvas(ev.clientX, ev.clientY)) {
+    if (o.emJogo() && emPartida()) {
+      if (arrasto === null) comecaArrasto(ev); // steering only: fire is automatic
+    } else if (toqueMenu === null && (o.emJogo() || noCanvas(ev.clientX, ev.clientY))) {
+      // menus: a click on the canvas; ready screen: a click anywhere outside the buttons dismisses "ready" (F12)
       toqueMenu = ev.pointerId;
       ultimoMenu = posMenu(ev.clientX, ev.clientY);
       o.entrada.push({ t: 'mmove', ...ultimoMenu });
@@ -306,6 +344,11 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
       if ((ix !== 0 || iy !== 0) && o.emJogo()) moveAlvoToque(ix, iy);
       resto.x -= ix; resto.y -= iy;
     } else if (ev.pointerId === toqueMenu) {
+      if (o.emJogo() && emPartida() && arrasto === null) { // the finger that dismissed "ready" goes on steering
+        soltaMenu();
+        comecaArrasto(ev);
+        return;
+      }
       ultimoMenu = posMenu(ev.clientX, ev.clientY);
       o.entrada.push({ t: 'mmove', ...ultimoMenu });
     }
@@ -344,11 +387,19 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   segura(bomba, K.LCTRL);
   segura(arma, K.LALT);
 
+  // --- touch auto-fire: Space held while the gameplay loop runs (checked once per poll) -----------------
+  const autoTiro = new AutoTiro((k, baixo) => seq.tecla(k, baixo));
+  seq.aoPoll = () => autoTiro.atualiza(autoTiroLigado({
+    toque: visivel, partida: emPartida(), confirmaAberto: !confirma.hidden, esc: o.entrada.teclas[K.ESC].pressionado,
+  }));
+  limpa.push(() => { seq.aoPoll = null; autoTiro.solta(); });
+
   // focus lost: attachDom already releases every key; forget the fingers too, or a button whose pointerup was
   // swallowed would stay "held" (its next press would not send a key) and keep its pressed look
   const perdeuFoco = (): void => {
     arrasto = null; toqueMenu = null;
     for (const f of soltaBotoes) f();
+    autoTiro.solta(); // attachDom's releaseAll already released Space; pressed again once the game runs again
   };
   ouve(window, 'blur', perdeuFoco);
   ouve(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') perdeuFoco(); });
@@ -358,11 +409,11 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
     confirma.hidden = true;
     o.congela?.(false);
   };
-  const emPartida = o.emPartida ?? o.emJogo;
   ouve<PointerEvent>(pausa, 'pointerdown', ev => {
     ev.preventDefault();
     if (!emPartida() || !confirma.hidden) return; // ready screen: Esc is a no-op there (jogo.cpp:115-122)
     soltaArrasto();
+    autoTiro.solta(); // pressed again after "Não" (next poll)
     confirma.hidden = false;
     o.congela?.(true);
   });
@@ -409,16 +460,18 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   const quadro = (): void => {
     if (!rodando) return;
     const jogo = o.emJogo(), partida = jogo && emPartida(), texto = o.textoAtivo();
+    const armaOff = armaInativa(o.armasLiberadas?.() ?? 6);
     if (!texto && document.activeElement === input) { input.blur(); input.value = ''; anterior = ''; }
     if (!jogo) { fechaConfirma(); soltaArrasto(); }
     const focado = document.activeElement === input;
-    const novo = `${visivel}|${jogo}|${partida}|${texto && !focado}`;
+    const novo = `${visivel}|${jogo}|${partida}|${texto && !focado}|${armaOff}`;
     if (novo !== estado) {
       estado = novo;
       root.classList.toggle('tq-on', visivel);
       root.classList.toggle('tq-jogo', jogo);
       root.classList.toggle('tq-partida', partida);
       root.classList.toggle('tq-digitar', visivel && texto && !focado);
+      arma.classList.toggle('tq-inativo', armaOff);
     }
     requestAnimationFrame(quadro);
   };

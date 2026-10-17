@@ -13,14 +13,14 @@ import { encaixa, paraLogico, aplicaEncaixe, alternaTelaCheia, type Encaixe, typ
 import { g, HOTSPOT } from './game/funcoes_M';
 import { textoAtivo } from './game/menu';
 import { principal } from './game/principal';
-import { emPartida } from './game/jogo';
-import { TELA_JOGO } from './game/constantes';
+import { emPartida, jogoAtual } from './game/jogo';
+import { TELA_JOGO, TIRO1, TIRO6 } from './game/constantes';
 import { initToque, reservaToque, posicionaToque } from './touch/touch';
 
 declare global {
   interface Window {
     /** Read-only probes for the e2e tests (Task 15) and debugging. */
-    __x85?: { estado: () => number; frame: () => number; fps: () => number; quads: () => number };
+    __x85?: { estado: () => number; frame: () => number; fps: () => number; quads: () => number; tiros: () => number };
   }
 }
 
@@ -155,6 +155,7 @@ function inicia(): void {
   soltaToque = initToque(document.getElementById('touch-root') as HTMLDivElement, tela, document.getElementById('texto') as HTMLInputElement, {
     entrada, mapear: mapaPonteiro, emJogo: () => g.estado_atual === TELA_JOGO, emPartida, textoAtivo: () => textoAtivo.v, hotspot: HOTSPOT,
     relayout: ajusta, congela: sim => { congeladoToque = sim; },
+    armasLiberadas: () => g.saveAtual.tiro_liberado.filter(Boolean).length,
   });
   gen = principal();
   passo = new PassoFixo(passoLogico, 60);
@@ -261,6 +262,8 @@ function instalaSondas(): void {
     frame: () => quadroLogico,
     fps: () => loop?.fps() ?? 0,
     quads: () => contador?.ultimo ?? 0,
+    // player shots alive right now (read-only, for the e2e auto-fire check)
+    tiros: () => jogoAtual.p?.tiros.filter(t => t.tipo >= TIRO1 && t.tipo <= TIRO6).length ?? 0,
   };
   setInterval(() => {
     const f = loop?.fps() ?? 0;

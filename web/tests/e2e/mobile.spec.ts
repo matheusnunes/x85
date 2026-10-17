@@ -105,14 +105,21 @@ test('mobile: taps, OS-keyboard name, planet 1, drag, BOMBA, ⏸ confirm; layout
   await page.waitForTimeout(800);
   await expect(page.locator('.tq-acao').first()).toBeVisible();
   await expect(page.locator('.tq-pausa')).toBeHidden();
+  expect(await page.evaluate(() => window.__x85!.tiros())).toBe(0);
   await toca(page, 400, 300); // dismiss "ready"
   await expect(page.locator('.tq-pausa')).toBeVisible();
+  // touch auto-fire (D10): with no finger on the play area the ship fires by itself
+  await page.waitForFunction(() => window.__x85!.tiros() >= 3, undefined, { timeout: 5000 });
+  await expect(page.locator('.tq-pad')).toContainText('Tiro automático');
+  // only weapon 1 unlocked in a new slot: ARMA looks inactive (it still shows the weapon info box when tapped)
+  await expect(page.locator('.tq-acao', { hasText: 'ARMA' })).toHaveClass(/tq-inativo/);
+  await expect(page.locator('.tq-acao', { hasText: 'BOMBA' })).not.toHaveClass(/tq-inativo/);
   await page.waitForTimeout(300);
   const modoJogo = await confereLayout(page);
   await guarda(page, info, 'jogo');
   await expect(page).toHaveScreenshot('layout-jogo.png', foto(page));
 
-  // drag on the canvas: the ship's target follows the finger (relative), fire held while down
+  // drag on the canvas: the ship's target follows the finger (relative); it only steers (fire is automatic)
   const [sx, sy] = await paraPagina(page, 400, 450);
   await ponteiro(page, '#tela', 'pointerdown', sx, sy);
   for (let i = 1; i <= 20; i++) { await ponteiro(page, '#tela', 'pointermove', sx - i * 5, sy - i * 4); await page.waitForTimeout(25); }

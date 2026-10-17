@@ -26,6 +26,9 @@
 .tq.tq-on.tq-jogo .tq-acao,.tq.tq-on.tq-jogo.tq-partida .tq-pausa{display:block}
 .tq.tq-on.tq-jogo[data-modo="sobre"] .tq-acao,.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-pausa{opacity:.4}
 .tq.tq-on.tq-jogo[data-modo="sobre"] .tq-apertado{opacity:.75}
+/* ARMA while only one weapon is unlocked: dimmed (still tappable — it shows the weapon info box) */
+.tq.tq-on.tq-jogo .tq-acao.tq-inativo{opacity:.35;border-color:rgba(255,255,255,.3)}
+.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-acao.tq-inativo{opacity:.2}
 
 /* "tap to type" hint during name entry while the OS keyboard is closed */
 .tq.tq-digitar .tq-dica-texto{display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;

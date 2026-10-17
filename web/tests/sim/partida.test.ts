@@ -10,6 +10,7 @@ import { menu_carrega } from '../../src/game/menu';
 import { jogo_tela, jogo_troca_tiro, jogoAtual, fase, emPartida } from '../../src/game/jogo';
 import { principal } from '../../src/game/principal';
 import { novoNave } from '../../src/game/tipos';
+import { Sequenciador, AutoTiro, autoTiroLigado } from '../../src/touch/touch';
 import {
   TELA_JOGO, TELA_MISSION, TELA_MAIN, SAIR, EASY, INVALIDO, TIRO1, TIRO2, TIRO3, TIRO5, TIRO6, BOSS1,
 } from '../../src/game/constantes';
@@ -127,6 +128,53 @@ test('scripted run: fire, bomb, weapon info, Esc → MISSION with the slot reloa
   expect(M.g.saveAtual).toEqual({ ...salvo, level: M.g.saveAtual.level });
   expect(M.g.saveAtual.nome).toBe('tester');
   expect(M.g.saveAtual.tiro_liberado[1]).toBe(false);
+});
+
+/** The touch wiring of initToque (DOM-free part): sequencer + auto-fire updated after every poll. */
+function toque(): { seq: Sequenciador; a: AutoTiro; solta: () => void } {
+  const seq = new Sequenciador(h.entrada);
+  const desinstala = seq.instala();
+  const a = new AutoTiro((k, baixo) => seq.tecla(k, baixo));
+  seq.aoPoll = () => a.atualiza(autoTiroLigado({ toque: true, partida: emPartida(), confirmaAberto: false, esc: h.entrada.teclas[K.ESC].pressionado }));
+  return { seq, a, solta: () => { a.solta(); desinstala(); } };
+}
+
+test('touch auto-fire (D10): "ready" dismissed by a tap, the ship fires within a few frames without any input (F13 intact)', () => {
+  const t = toque();
+  try {
+    const g = novaPartida();
+    for (let i = 0; i < 6; i++) frame(g);
+    expect(h.entrada.teclas[K.ESPACO].ativo).toBe(false); // ready screen: no auto-fire
+    expect(jogoAtual.p).toBeNull();
+    t.seq.mouse(true, 400, 300); t.seq.mouse(false, 400, 300); // a quick tap (left click) dismisses "ready"
+    frame(g);
+    expect(jogoAtual.p).not.toBeNull();
+    let primeiro = -1;
+    for (let i = 1; i <= 10 && primeiro < 0; i++) { frame(g); if (tirosDoJogador() > 0) primeiro = i; }
+    expect(primeiro).toBeGreaterThan(0);
+    expect(primeiro).toBeLessThanOrEqual(3);
+    for (let i = 0; i < 60; i++) frame(g);
+    expect(tirosDoJogador()).toBeGreaterThan(5); // keeps firing while held
+  } finally { t.solta(); }
+});
+
+test('touch auto-fire (D10): leaving with Esc never hands a Space press to the next screen', () => {
+  const t = toque();
+  try {
+    const g = novaPartida();
+    for (let i = 0; i < 6; i++) frame(g);
+    t.seq.mouse(true, 400, 300); t.seq.mouse(false, 400, 300); // tap: dismiss "ready"
+    for (let i = 0; i < 20; i++) frame(g);
+    expect(h.entrada.teclas[K.ESPACO].ativo).toBe(true);
+    t.a.solta(); // ⏸ opens the dialog: Space released, logic frozen (no polls) while it is open
+    t.seq.tecla(K.ESC, true); t.seq.tecla(K.ESC, false); // "Sim" → Esc
+    let r = frame(g);
+    let i = 0;
+    while (!r.done && i++ < 5) { r = frame(g); expect(h.entrada.teclas[K.ESPACO].pressionado).toBe(false); }
+    expect(r.done).toBe(true);
+    for (let k = 0; k < 3; k++) { h.entrada.poll(); expect(h.entrada.teclas[K.ESPACO].pressionado).toBe(false); }
+    expect(h.entrada.teclas[K.ESPACO].ativo).toBe(false); // released once the gameplay loop is over
+  } finally { t.solta(); }
 });
 
 test('4000-frame run (ship kept alive): the fase1 boss activates on game frame 3070; killing it wins → slot saved, record, MISSION 200 frames later', () => {
