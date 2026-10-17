@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>X85</title>
+  <style>
+    html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;
+      -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    #palco{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+    #tela{display:block;cursor:none;image-rendering:auto;background:#000}
+    #texto{position:fixed;left:-1000px;top:0;opacity:0;width:1px;height:1px}
+  </style>
+</head>
+<body>
+  <div id="palco"><canvas id="tela" width="800" height="600"></canvas></div>
+  <div id="touch-root"></div>
+  <input id="texto" type="text" maxlength="14" autocomplete="off" autocapitalize="off" spellcheck="false" />
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
