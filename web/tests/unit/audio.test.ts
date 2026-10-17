@@ -1,0 +1,106 @@
+import { test, expect } from 'vitest';
+import {
+  ganhosPan, initAudio, CA2_CarregaEfeito, CA2_TocaEfeito, CA2_TocaEfeitoTela, CA2_AjustaVolume,
+  CA2_CarregaMusica, CA2_TocaMusica, desbloqueiaAudio, portaSilenciosa, type AudioPort,
+} from '../../src/engine/audio';
+
+const fake = (unlocked = true) => {
+  const ends: (() => void)[] = [];
+  const tocados: { l: number; r: number }[] = [];
+  const musicas: { m4a: string; ogg: string; vol: number; loop: boolean }[] = [];
+  const volumes: number[] = [];
+  let desbloqueado = unlocked;
+  const port: AudioPort = {
+    agora: () => 0, tocaBuffer: (_b, l, r, onEnd) => { tocados.push({ l, r }); ends.push(onEnd); }, decodifica: async () => ({}),
+    musica: (m4a, ogg, vol, loop) => { musicas.push({ m4a, ogg, vol, loop: !!loop }); }, volumeMusica: v => { volumes.push(v); },
+    desbloqueia: async () => { desbloqueado = true; }, desbloqueado: () => desbloqueado,
+  };
+  return { port, ends, tocados, musicas, volumes };
+};
+const man = {
+  images: {}, maps: {},
+  music: { './dados/sons/recharge_alvys18.ogg': { m4a: 'a.m4a', ogg: 'a.ogg' } },
+  sounds: { 'dados/sons/explo.wav': { url: 'x' }, './dados/sons/click.ogg': { url: 'c' } },
+} as any;
+
+test('centre pan is ~-6 dB at full volume', () => { const [l, r] = ganhosPan(0, 100); expect(l).toBeCloseTo(127 / 255); expect(r).toBeCloseTo(127 / 255); });
+test('volume 30 → 38/128', () => { const [l] = ganhosPan(-100, 30); expect(l).toBeCloseTo((254 / 255) * (38 / 128)); });
+test('pan is clamped and truncated like the C code', () => {
+  expect(ganhosPan(-500, 100)).toEqual(ganhosPan(-100, 100));
+  const [l, r] = ganhosPan(1, 100); // L = trunc(99*254/200) = 125, R = trunc(101*254/200) = 128
+  expect(l).toBeCloseTo(125 / 255); expect(r).toBeCloseTo(128 / 255);
+  expect(ganhosPan(-100, 100)[1]).toBe(0);
+});
+test('9th simultaneous sound is dropped', async () => {
+  const { port, ends } = fake(); await initAudio(port, man); CA2_AjustaVolume(30, 30);
+  const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+  const ch = Array.from({ length: 9 }, () => CA2_TocaEfeito(id, 0));
+  expect(ch.slice(0, 8).every(c => c >= 0)).toBe(true); expect(ch[8]).toBe(-1);
+  expect(new Set(ch.slice(0, 8)).size).toBe(8);
+  ends[0](); expect(CA2_TocaEfeito(id, 0)).toBe(ch[0]); // freed channel is reused
+});
+test('play before unlock is a no-op', async () => {
+  const { port, tocados } = fake(false); await initAudio(port, man);
+  expect(CA2_TocaEfeito(CA2_CarregaEfeito('./dados/sons/explo.wav'), 0)).toBe(-1);
+  expect(tocados.length).toBe(0);
+});
+test('ids are 1-based, cached by normalised path; unknown path → 0; id 0 is silent and returns 0', async () => {
+  const { port, tocados } = fake(); await initAudio(port, man);
+  const a = CA2_CarregaEfeito('./dados/sons/click.ogg');
+  const b = CA2_CarregaEfeito('dados/sons/explo.wav');
+  expect(a).toBe(1); expect(b).toBe(2);
+  expect(CA2_CarregaEfeito('./dados/sons/explo.wav')).toBe(2);
+  expect(CA2_CarregaEfeito('./dados/sons/tiro3.wav')).toBe(0);
+  expect(CA2_TocaEfeito(0, 0)).toBe(0); expect(CA2_TocaEfeitoTela(0, 400)).toBe(0);
+  expect(tocados.length).toBe(0);
+});
+test('effects not decoded yet are dropped (R2)', async () => {
+  const { port, tocados } = fake();
+  let resolve!: (v: unknown) => void;
+  port.decodifica = () => new Promise(r => { resolve = r; });
+  const pronto = initAudio(port, { ...man, sounds: { 'dados/sons/explo.wav': { url: 'x' } } });
+  const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+  expect(id).toBe(1);
+  expect(CA2_TocaEfeito(id, 0)).toBe(-1);
+  resolve({}); await pronto;
+  expect(CA2_TocaEfeito(id, 0)).toBe(0);
+  expect(tocados.length).toBe(1);
+});
+test('TocaEfeitoTela maps x (clamped 0..800) to pan', async () => {
+  const { port, tocados, ends } = fake(); await initAudio(port, man); CA2_AjustaVolume(100, 100);
+  const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+  CA2_TocaEfeitoTela(id, -50); CA2_TocaEfeitoTela(id, 400); CA2_TocaEfeitoTela(id, 2000); CA2_TocaEfeitoTela(id, 3);
+  const g = (p: number) => { const [l, r] = ganhosPan(p, 100); return { l, r }; };
+  expect(tocados[0]).toEqual(g(-100)); expect(tocados[1]).toEqual(g(0)); expect(tocados[2]).toEqual(g(100));
+  expect(tocados[3]).toEqual(g(-100)); // trunc(200*3/800) - 100 = -100
+  ends.forEach(e => e());
+});
+test('volume is clamped to 0..100 and quantised to /128', async () => {
+  const { port, volumes } = fake(); await initAudio(port, man);
+  CA2_AjustaVolume(250, 30);
+  expect(volumes.at(-1)).toBe(1);
+  CA2_AjustaVolume(30, 30);
+  expect(volumes.at(-1)).toBe(38 / 128);
+});
+test('music: 1-based id, restart with loop when vezes == -1; unknown → 0 and silent', async () => {
+  const { port, musicas } = fake(); await initAudio(port, man); CA2_AjustaVolume(30, 30);
+  const m = CA2_CarregaMusica('./dados/sons/recharge_alvys18.ogg');
+  expect(m).toBe(1); expect(CA2_CarregaMusica('dados/sons/recharge_alvys18.ogg')).toBe(1);
+  expect(CA2_CarregaMusica('./nada.ogg')).toBe(0);
+  CA2_TocaMusica(0, -1);
+  expect(musicas.length).toBe(0);
+  CA2_TocaMusica(m, -1);
+  expect(musicas).toEqual([{ m4a: 'a.m4a', ogg: 'a.ogg', vol: 38 / 128, loop: true }]);
+});
+test('desbloqueiaAudio unlocks the port', async () => {
+  const { port } = fake(false); await initAudio(port, man);
+  const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+  expect(CA2_TocaEfeito(id, 0)).toBe(-1);
+  await desbloqueiaAudio();
+  expect(CA2_TocaEfeito(id, 0)).toBe(0);
+});
+test('silent port is always unlocked and frees voices immediately', async () => {
+  await initAudio(portaSilenciosa(), man);
+  const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+  for (let i = 0; i < 20; i++) expect(CA2_TocaEfeito(id, 0)).toBe(0);
+});
