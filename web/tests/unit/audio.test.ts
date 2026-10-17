@@ -1,7 +1,7 @@
 import { test, expect, vi } from 'vitest';
 import {
   ganhosPan, initAudio, CA2_CarregaEfeito, CA2_TocaEfeito, CA2_TocaEfeitoTela, CA2_AjustaVolume,
-  CA2_CarregaMusica, CA2_TocaMusica, CA2_PausaMusica, CA2_ContinuaMusica, desbloqueiaAudio, portaSilenciosa, type AudioPort,
+  CA2_CarregaMusica, CA2_TocaMusica, CA2_PausaMusica, CA2_ContinuaMusica, desbloqueiaAudio, portaSilenciosa, criaPortaWebAudio, type AudioPort,
 } from '../../src/engine/audio';
 
 const fake = (unlocked = true) => {
@@ -144,4 +144,40 @@ test('CA2_PausaMusica / CA2_ContinuaMusica forward to the port (R11); ports with
   expect(() => { CA2_PausaMusica(); CA2_ContinuaMusica(); }).not.toThrow();
   await initAudio(portaSilenciosa(), man);
   expect(() => { CA2_PausaMusica(); CA2_ContinuaMusica(); }).not.toThrow();
+});
+
+test('web port: music refused during an iOS interruption starts as soon as the context resumes (no 2nd gesture)', async () => {
+  // Minimal AudioContext / HTMLAudioElement stand-ins: the context starts "interrupted" and resume() takes a few
+  // ticks; play() is refused while the context is not running (what iOS does after an interruption).
+  const estado = { s: 'interrupted' as string };
+  const plays: string[] = [];
+  const no = () => ({ connect() {}, disconnect() {}, gain: { value: 1 } });
+  class CtxFalso {
+    get state(): string { return estado.s; }
+    destination = {};
+    currentTime = 0;
+    createGain() { return no(); }
+    createMediaElementSource() { return no(); }
+    async resume(): Promise<void> { for (let i = 0; i < 3; i++) await Promise.resolve(); estado.s = 'running'; }
+  }
+  class AudioFalso {
+    preload = ''; src = ''; loop = false; muted = false; currentTime = 0;
+    canPlayType(): string { return ''; }
+    pause(): void {}
+    play(): Promise<void> {
+      plays.push(estado.s);
+      return estado.s === 'running' ? Promise.resolve() : Promise.reject(new Error('NotAllowedError'));
+    }
+  }
+  vi.stubGlobal('AudioContext', CtxFalso);
+  vi.stubGlobal('Audio', AudioFalso);
+  try {
+    const port = criaPortaWebAudio('');
+    port.musica('a.m4a', 'a.ogg', 1, true); // requested while interrupted → pending
+    expect(plays).toEqual([]);
+    await port.desbloqueia();                // one gesture
+    await Promise.resolve();
+    expect(plays).toEqual(['interrupted', 'running']); // refused inside the gesture, started right after resume()
+    expect(port.desbloqueado()).toBe(true);
+  } finally { vi.unstubAllGlobals(); }
 });

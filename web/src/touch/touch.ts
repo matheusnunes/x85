@@ -15,6 +15,8 @@ export interface ToqueOpts {
   /** Client (CSS px) → logical 800x600 pixel (main.ts mapaPonteiro). */
   mapear: (cx: number, cy: number) => { x: number; y: number };
   emJogo: () => boolean;
+  /** The gameplay loop proper runs (not the ready screen): ⏸ is shown/active only then. Defaults to emJogo. */
+  emPartida?: () => boolean;
   textoAtivo: () => boolean;
   /** Cursor hotspot (funcoes_M HOTSPOT): the mouse is put at tap − hotspot so the click point is the finger. */
   hotspot: { x: number; y: number };
@@ -318,15 +320,14 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   ouve<TouchEvent>(window, 'touchstart', ev => {
     if (o.textoAtivo() && ev.target !== input && !ehUi(ev.target) && ev.cancelable) ev.preventDefault();
   }, { passive: false });
-  const perdeuFoco = (): void => { arrasto = null; toqueMenu = null; }; // attachDom already releases every key
-  ouve(window, 'blur', perdeuFoco);
-  ouve(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') perdeuFoco(); });
-
   // --- buttons ------------------------------------------------------------------------------------
+  const soltaBotoes: (() => void)[] = []; // forget held BOMBA/ARMA fingers (their pointerup may never arrive)
   const segura = (b: HTMLElement, k: K): void => {
     const ids = new Set<number>();
+    soltaBotoes.push(() => { ids.clear(); b.classList.remove('tq-apertado'); });
     ouve<PointerEvent>(b, 'pointerdown', ev => {
       ev.preventDefault();
+      if (!confirma.hidden) return; // the game is frozen behind the "back to menu?" dialog: a press must not queue
       if (ids.size === 0) seq.tecla(k, true);
       ids.add(ev.pointerId);
       b.classList.add('tq-apertado');
@@ -342,14 +343,24 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   segura(bomba, K.LCTRL);
   segura(arma, K.LALT);
 
+  // focus lost: attachDom already releases every key; forget the fingers too, or a button whose pointerup was
+  // swallowed would stay "held" (its next press would not send a key) and keep its pressed look
+  const perdeuFoco = (): void => {
+    arrasto = null; toqueMenu = null;
+    for (const f of soltaBotoes) f();
+  };
+  ouve(window, 'blur', perdeuFoco);
+  ouve(document, 'visibilitychange', () => { if (document.visibilityState === 'hidden') perdeuFoco(); });
+
   const fechaConfirma = (): void => {
     if (confirma.hidden) return;
     confirma.hidden = true;
     o.congela?.(false);
   };
+  const emPartida = o.emPartida ?? o.emJogo;
   ouve<PointerEvent>(pausa, 'pointerdown', ev => {
     ev.preventDefault();
-    if (!o.emJogo() || !confirma.hidden) return;
+    if (!emPartida() || !confirma.hidden) return; // ready screen: Esc is a no-op there (jogo.cpp:115-122)
     soltaArrasto();
     confirma.hidden = false;
     o.congela?.(true);
@@ -396,15 +407,16 @@ export function initToque(root: HTMLElement, canvas: HTMLCanvasElement, input: H
   let estado = '';
   const quadro = (): void => {
     if (!rodando) return;
-    const jogo = o.emJogo(), texto = o.textoAtivo();
+    const jogo = o.emJogo(), partida = jogo && emPartida(), texto = o.textoAtivo();
     if (!texto && document.activeElement === input) { input.blur(); input.value = ''; anterior = ''; }
     if (!jogo) { fechaConfirma(); soltaArrasto(); }
     const focado = document.activeElement === input;
-    const novo = `${visivel}|${jogo}|${texto && !focado}`;
+    const novo = `${visivel}|${jogo}|${partida}|${texto && !focado}`;
     if (novo !== estado) {
       estado = novo;
       root.classList.toggle('tq-on', visivel);
       root.classList.toggle('tq-jogo', jogo);
+      root.classList.toggle('tq-partida', partida);
       root.classList.toggle('tq-digitar', visivel && texto && !focado);
     }
     requestAnimationFrame(quadro);

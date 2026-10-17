@@ -4,6 +4,7 @@ import { dadosDeTeste, memStorage } from '../unit/fixture';
 import * as M from '../../src/game/funcoes_M';
 import {
   menu_carrega, menu_main, menu_slot_select, menu_slot_insert, menu_mission, menu_ranking, menu_opcoes, menu_about, textoAtivo,
+  CREDITOS, paginaAbout,
 } from '../../src/game/menu';
 import { K } from '../../src/engine/input';
 import { TELA_MAIN, TELA_SLOT_SELECT, TELA_SLOT_INSERT, TELA_MISSION, TELA_OPCOES, TELA_RANKING, TELA_ABOUT, TELA_JOGO, SAIR, EASY, HARD } from '../../src/game/constantes';
@@ -253,4 +254,37 @@ test('about: glow alpha pulses (0→255 in 51 frames)', () => {
   expect(Math.round(alphas[0])).toBe(5); expect(Math.round(alphas[50])).toBe(255); expect(Math.round(alphas[51])).toBe(255);
   expect(Math.round(alphas[52])).toBe(250);
   M.g.estado_atual = TELA_MAIN; ateFim(g);
+});
+test('about: credits page (D10, R19) — the original art first; panel click / Space / arrows switch pages; back still works', () => {
+  longe(); const g = abre(TELA_ABOUT, menu_about); anda(g, 12); // fade-in done
+  const tex = (p: string, w = 0, hh = 0) => C2D2_PegaSpriteSet(C2D2_CarregaSpriteSet(p, w, hh))!.tex;
+  const about1 = tex('./dados/menu/about1.png'), about2 = tex('./dados/menu/about2.png');
+  const fonteTex = tex('./dados/menu/512.png', 32, 32);
+  const quadro = () => { const n = h.backend.quads.length; frame(g); return h.backend.quads.slice(n); };
+  const texto = (q: ReturnType<typeof quadro>, y: number) =>
+    String.fromCharCode(...q.filter(x => x.tex === fonteTex && x.dy === y).map(x => (x.sy / 32) * 16 + x.sx / 32));
+  // page 0: the original about1 at (200,100) + the about2 glow, untouched, plus the page hint
+  let q = quadro();
+  expect(paginaAbout.v).toBe(0);
+  expect(q.some(x => x.tex === about1 && x.dx === 200 && x.dy === 100)).toBe(true);
+  expect(q.some(x => x.tex === about2)).toBe(true);
+  expect(texto(q, 488)).toBe('créditos >');
+  // Space → credits page: no about art, every credit line drawn with the menu font (Latin-1 glyphs)
+  tecla(g, K.ESPACO); q = quadro();
+  expect(paginaAbout.v).toBe(1);
+  expect(q.some(x => x.tex === about1 || x.tex === about2)).toBe(false);
+  CREDITOS.forEach((linha, i) => { if (linha) expect(texto(q, 112 + 37 * i)).toBe(linha); });
+  expect(CREDITOS).toContain('newgrounds.com/audio/listen/348628');
+  expect(CREDITOS).toContain('newgrounds.com/audio/listen/347665');
+  expect(texto(q, 488)).toBe('< sobre');
+  // a click on the panel (hotspot inside it) goes back to the original page; → toggles again
+  clica(g, [430, 300]); expect(paginaAbout.v).toBe(0);
+  tecla(g, K.DIREITA); frame(g); expect(paginaAbout.v).toBe(1);
+  // the back button still returns to MAIN and does not switch pages
+  longe(); frame(g);
+  clica(g, BACK()); expect(M.g.estado_atual).toBe(TELA_MAIN); expect(paginaAbout.v).toBe(1);
+  ateFim(g);
+  // re-entering About starts on the original page
+  const g2 = abre(TELA_ABOUT, menu_about); frame(g2); expect(paginaAbout.v).toBe(0);
+  M.g.estado_atual = TELA_MAIN; ateFim(g2);
 });

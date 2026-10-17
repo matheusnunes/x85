@@ -30,6 +30,24 @@
       align-items:center;justify-content:center;gap:.6em;cursor:pointer;
       font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:clamp(14px,3vmin,28px)}
     #pausa b{font-size:1.8em;letter-spacing:.2em}
+    #sonda-segura{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;
+      padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    #sobre-link{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));
+      color:#8a8a8a;font-size:13px;text-decoration:none;letter-spacing:.04em;padding:8px 12px}
+    #sobre-link:hover,#sobre-link:focus-visible{color:#e0e0e0;text-decoration:underline}
+    #creditos{position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#d0d0d0;cursor:default;
+      padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    #creditos[hidden]{display:none}
+    #creditos .caixa{background:#0d0f18;border:1px solid #2f3448;border-radius:12px;padding:18px 22px;max-width:min(92vw,520px);
+      max-height:86vh;overflow:auto;font-size:14px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+    #creditos h2{margin:0 0 .6em;font-size:18px;letter-spacing:.12em;color:#fff}
+    #creditos dl{margin:0}
+    #creditos dt{color:#8f96b0;font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-top:.8em}
+    #creditos dd{margin:.15em 0 0}
+    #creditos a{color:#9cc2ff}
+    #creditos button{margin-top:1.1em;font:inherit;color:#fff;background:#1c2236;border:1px solid #45507a;border-radius:8px;
+      padding:8px 18px;cursor:pointer}
     #fps{position:fixed;z-index:30;pointer-events:none;font:11px/1 ui-monospace,Menlo,Consolas,monospace;
       color:#fff;opacity:.55;background:rgba(0,0,0,.35);padding:2px 4px;border-radius:3px}
   </style>
@@ -38,8 +56,29 @@
   <div id="palco"><canvas id="tela" width="800" height="600"></canvas></div>
   <div id="touch-root"></div>
   <div id="pausa" hidden><b>PAUSA</b><span>Clique / toque ou tecle para continuar</span></div>
-  <div id="splash"><img id="splash-logo" src="./assets/dados/menu/x85.jpg" alt="X85" draggable="false" /><div id="splash-texto">Carregando…</div></div>
+  <div id="splash"><img id="splash-logo" src="./assets/dados/menu/x85.jpg" alt="X85" draggable="false" /><div id="splash-texto">Carregando…</div>
+    <a id="sobre-link" href="#creditos" role="button" aria-controls="creditos">Sobre / créditos</a></div>
+  <div id="creditos" hidden role="dialog" aria-modal="true" aria-labelledby="creditos-titulo">
+    <div class="caixa">
+      <h2 id="creditos-titulo">X85 — créditos</h2>
+      <dl>
+        <dt>Jogo original (2010)</dt>
+        <dd>Christian Isenberg, Diego Lopes Simioni, Matheus Gobato Nunes</dd>
+        <dt>Música do menu</dt>
+        <dd>“Recharge” — alvys18 · <a href="https://www.newgrounds.com/audio/listen/348628" target="_blank" rel="noopener">newgrounds.com/audio/listen/348628</a></dd>
+        <dt>Música do jogo</dt>
+        <dd>“Esprit” — SasquaMox · <a href="https://www.newgrounds.com/audio/listen/347665" target="_blank" rel="noopener">newgrounds.com/audio/listen/347665</a>
+          (<a href="https://creativecommons.org/licenses/by-nc/3.0/" target="_blank" rel="noopener">CC BY-NC 3.0</a>)</dd>
+        <dt>Engine original</dt>
+        <dd>Chien2D 2 — Paulo Vinicius Wolski Radtke</dd>
+        <dt>Versão web</dt>
+        <dd>2026 — TypeScript / WebGL2</dd>
+      </dl>
+      <button id="creditos-fechar" type="button">Fechar</button>
+    </div>
+  </div>
   <div id="fps">-- fps</div>
+  <div id="sonda-segura"></div>
   <input id="texto" type="text" maxlength="14" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" aria-label="Nome" />
   <script type="module" src="./src/main.ts"></script>
 </body>

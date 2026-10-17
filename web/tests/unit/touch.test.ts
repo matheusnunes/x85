@@ -89,6 +89,13 @@ test('a dead ship ignores (and drops) touch nudges, like the keyboard', () => {
   expect([n.xaux, n.yaux]).toEqual([400, 400]);
 });
 
+test('a nudge pending when a new game starts is dropped by jogo_inicia_jogador (Task 15)', () => {
+  J.moveAlvoToque(120, -80); // e.g. a drag during the last frames of the previous game / the ready screen
+  const n = jogador();       // jogo_inicia_jogador
+  J.jogo_atualiza_jogador(n, explos());
+  expect([n.xaux, n.yaux]).toEqual([400, 400]);
+});
+
 // --- Sequenciador ----------------------------------------------------------------------------------
 test('a tap whose down and up land in the same frame still produces a press edge (up deferred one poll)', () => {
   const e = new Entrada(); const s = new Sequenciador(e); const solta = s.instala();

@@ -274,7 +274,12 @@ export function criaPortaWebAudio(base = ''): AudioPort {
           () => { f.el.muted = false; });
       }
       if (pendente) tocaAtual();
-      if (ctx.state !== 'running') await ctx.resume();
+      if (ctx.state !== 'running') {
+        await ctx.resume();
+        // iOS interruption: the play() above may have been refused while the context was still suspended
+        // (pendente set again) — start the track now that it runs, without waiting for a second gesture
+        if (pendente) tocaAtual();
+      }
     },
     desbloqueado: () => ctx.state === 'running',
   };

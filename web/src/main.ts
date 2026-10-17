@@ -9,10 +9,11 @@ import { Entrada, attachDom, pollGamepads } from './engine/input';
 import { bindEntrada } from './engine/c2d2';
 import { initAudio, criaPortaWebAudio, desbloqueiaAudio, CA2_PausaMusica, CA2_ContinuaMusica } from './engine/audio';
 import { PassoFixo, iniciaLoop, type Loop } from './engine/loop';
-import { encaixa, paraLogico, aplicaEncaixe, alternaTelaCheia, type Encaixe } from './engine/viewport';
+import { encaixa, paraLogico, aplicaEncaixe, alternaTelaCheia, type Encaixe, type Margens } from './engine/viewport';
 import { g, HOTSPOT } from './game/funcoes_M';
 import { textoAtivo } from './game/menu';
 import { principal } from './game/principal';
+import { emPartida } from './game/jogo';
 import { TELA_JOGO } from './game/constantes';
 import { initToque, reservaToque, posicionaToque } from './touch/touch';
 
@@ -30,6 +31,10 @@ const splashLogo = document.getElementById('splash-logo') as HTMLImageElement;
 const splashTexto = document.getElementById('splash-texto') as HTMLDivElement;
 const pausa = document.getElementById('pausa') as HTMLDivElement;
 const fpsEl = document.getElementById('fps') as HTMLDivElement;
+const sondaSegura = document.getElementById('sonda-segura') as HTMLDivElement; // padding = env(safe-area-inset-*)
+const sobreLink = document.getElementById('sobre-link') as HTMLAnchorElement;
+const creditos = document.getElementById('creditos') as HTMLDivElement;
+const creditosFechar = document.getElementById('creditos-fechar') as HTMLButtonElement;
 
 /** Counts the quads (sprites + 1-px points) sent per frame, for window.__x85.quads(). */
 class ContaQuads implements Backend {
@@ -44,7 +49,13 @@ class ContaQuads implements Backend {
 }
 
 // --- layout -------------------------------------------------------------------------------------------
-let encaixe: Encaixe = encaixa(window.innerWidth, window.innerHeight, reservaToque());
+/** Safe-area insets in CSS px (status bar / notch / rounded corners), read from a probe styled with env(). */
+function margensSeguras(): Margens {
+  const cs = getComputedStyle(sondaSegura);
+  return { t: parseFloat(cs.paddingTop) || 0, r: parseFloat(cs.paddingRight) || 0, b: parseFloat(cs.paddingBottom) || 0, l: parseFloat(cs.paddingLeft) || 0 };
+}
+
+let encaixe: Encaixe = encaixa(window.innerWidth, window.innerHeight, reservaToque(), margensSeguras());
 
 function posicionaSobreTela(el: HTMLElement, e: Encaixe): void {
   el.style.left = `${e.esquerda}px`; el.style.top = `${e.topo}px`;
@@ -52,7 +63,7 @@ function posicionaSobreTela(el: HTMLElement, e: Encaixe): void {
 }
 
 function ajusta(): void {
-  encaixe = encaixa(palco.clientWidth || window.innerWidth, palco.clientHeight || window.innerHeight, reservaToque());
+  encaixe = encaixa(palco.clientWidth || window.innerWidth, palco.clientHeight || window.innerHeight, reservaToque(), margensSeguras());
   aplicaEncaixe(tela, encaixe);
   posicionaSobreTela(pausa, encaixe);
   // splash: x85.jpg (177x38) at (312,270) of the 800x600 screen, as main.cpp:16 draws it
@@ -64,10 +75,11 @@ function ajusta(): void {
   splashTexto.style.width = `${encaixe.largura}px`;
   splashTexto.style.top = `${encaixe.topo + 330 * s}px`;
   splashTexto.style.fontSize = `${Math.max(13, Math.round(20 * s))}px`;
-  // FPS counter: top-right corner of the canvas box, kept clear of notches / rounded corners (Ruling R6)
-  const direita = Math.max(0, window.innerWidth - (encaixe.esquerda + encaixe.largura));
+  // FPS counter: top of the canvas box, right side, its right edge at logical x = 760 so it stays clear of the
+  // HUD bomb icons column (x 774..800); kept clear of notches / rounded corners (Rulings R6, R20)
+  const direita = Math.max(0, window.innerWidth - (encaixe.esquerda + 760 * s));
   fpsEl.style.top = `max(${encaixe.topo + 4}px, env(safe-area-inset-top))`;
-  fpsEl.style.right = `max(${direita + 6}px, env(safe-area-inset-right))`;
+  fpsEl.style.right = `max(${direita}px, env(safe-area-inset-right))`;
   posicionaToque(encaixe); // touch controls (Task 14)
 }
 
@@ -103,18 +115,38 @@ function passoLogico(): void {
   pollGamepads(entrada, navigator.getGamepads ? navigator.getGamepads() : [], pads);
   entrada.poll();
   quadroLogico++;
-  if (gen.next().done) voltaSplash();
+  let fim: boolean | undefined;
+  try {
+    fim = gen.next().done;
+  } catch (erro) {
+    falhaFatal(erro); // a bug in a screen must not freeze the page silently
+    return;
+  }
+  if (fim) voltaSplash();
+}
+
+/** Unexpected exception in the game: stop everything and show the error splash (like a failed boot). */
+function falhaFatal(erro: unknown): void {
+  console.error('X85: erro inesperado no jogo', erro);
+  loop?.stop(); loop = null; passo = null; gen = null;
+  soltaDom?.(); soltaDom = null;
+  soltaToque?.(); soltaToque = null;
+  pausadoJogo = false; pausa.hidden = true;
+  CA2_PausaMusica();
+  fase = 'erro';
+  mostraSplash('Ocorreu um erro inesperado. Recarregue a página.', false);
 }
 
 function inicia(): void {
   if (fase !== 'pronto') return;
   fase = 'rodando';
   splash.hidden = true;
+  creditos.hidden = true;
   entrada = new Entrada();
   bindEntrada(entrada);
   soltaDom = attachDom(entrada, window, mapaPonteiro);
   soltaToque = initToque(document.getElementById('touch-root') as HTMLDivElement, tela, document.getElementById('texto') as HTMLInputElement, {
-    entrada, mapear: mapaPonteiro, emJogo: () => g.estado_atual === TELA_JOGO, textoAtivo: () => textoAtivo.v, hotspot: HOTSPOT,
+    entrada, mapear: mapaPonteiro, emJogo: () => g.estado_atual === TELA_JOGO, emPartida, textoAtivo: () => textoAtivo.v, hotspot: HOTSPOT,
     relayout: ajusta, congela: sim => { congeladoToque = sim; },
   });
   gen = principal();
@@ -154,8 +186,22 @@ function instalaEventos(): void {
   const desbloqueia = (): void => { void desbloqueiaAudio(); };
   for (const t of ['pointerdown', 'keydown', 'touchend'] as const) window.addEventListener(t, desbloqueia, { capture: true });
 
+  // D10 (web addition, R19): "Sobre / créditos" link on the start splash → credits overlay with links.
+  // Neither the link nor the overlay starts the game; Esc or "Fechar" closes it.
+  const fechaCreditos = (): void => {
+    creditos.hidden = true;
+    (document.activeElement as HTMLElement | null)?.blur?.(); // the next key/click on the splash starts the game
+  };
+  sobreLink.addEventListener('click', ev => { ev.preventDefault(); creditos.hidden = false; creditosFechar.focus({ preventScroll: true }); });
+  creditosFechar.addEventListener('click', fechaCreditos);
+  creditos.addEventListener('click', ev => { if (ev.target === creditos) fechaCreditos(); });
+  window.addEventListener('keydown', ev => { if (ev.code === 'Escape' && !creditos.hidden) fechaCreditos(); });
+  const naUiDoSplash = (ev: Event): boolean =>
+    !creditos.hidden || (ev.target instanceof Element && !!ev.target.closest('#sobre-link, #creditos'));
+
   // Start gesture on the splash; while paused, any key/click/tap resumes and is swallowed (it must not reach the game).
   const gesto = (ev: Event): void => {
+    if (fase === 'pronto' && naUiDoSplash(ev)) return;
     if (ev instanceof KeyboardEvent) {
       if (ev.repeat || ['Escape', 'KeyF', 'AltLeft', 'AltRight', 'ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'MetaLeft', 'MetaRight', 'Tab'].includes(ev.code)) return;
     }
@@ -184,8 +230,9 @@ function instalaEventos(): void {
   tela.addEventListener('contextmenu', ev => ev.preventDefault()); // R12c
   palco.addEventListener('contextmenu', ev => ev.preventDefault());
 
-  for (const t of ['resize', 'orientationchange', 'fullscreenchange', 'webkitfullscreenchange'] as const) window.addEventListener(t, ajusta);
-  document.addEventListener('fullscreenchange', ajusta);
+  for (const t of ['resize', 'orientationchange'] as const) window.addEventListener(t, ajusta);
+  // fullscreenchange is fired at the document (and bubbles to window): listen once, on the document only
+  for (const t of ['fullscreenchange', 'webkitfullscreenchange'] as const) document.addEventListener(t, ajusta);
   window.visualViewport?.addEventListener('resize', ajusta);
 }
 

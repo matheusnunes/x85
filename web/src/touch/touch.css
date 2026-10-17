@@ -23,7 +23,7 @@
   min-width:64px;min-height:64px;-webkit-tap-highlight-color:transparent;outline:none}
 .tq-bot.tq-apertado{background:rgba(200,40,40,.85);border-color:#fff;transform:scale(.94)}
 .tq-pausa{font-size:22px;border-radius:14px}
-.tq.tq-on.tq-jogo .tq-acao,.tq.tq-on.tq-jogo .tq-pausa{display:block}
+.tq.tq-on.tq-jogo .tq-acao,.tq.tq-on.tq-jogo.tq-partida .tq-pausa{display:block}
 .tq.tq-on.tq-jogo[data-modo="sobre"] .tq-acao,.tq.tq-on.tq-jogo[data-modo="sobre"] .tq-pausa{opacity:.4}
 .tq.tq-on.tq-jogo[data-modo="sobre"] .tq-apertado{opacity:.75}
 

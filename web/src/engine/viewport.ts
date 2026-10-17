@@ -6,22 +6,30 @@ import { LARGURA_TELA, ALTURA_TELA } from './renderer';
 /** CSS box of the canvas inside its container, in CSS pixels; escala = CSS px per logical px. */
 export interface Encaixe { escala: number; largura: number; altura: number; esquerda: number; topo: number }
 
+/** Safe-area insets (CSS px) — env(safe-area-inset-*): notch, status bar, rounded corners. */
+export interface Margens { t: number; r: number; b: number; l: number }
+
 /**
  * Fits 800x600 (4:3) inside the window, centred. When `reservaInferior` is given and the window is portrait
  * (h > w), the fit is done inside (w, h - reservaInferior) and anchored to the top (room for touch controls).
+ * Safe areas (`margens`): in portrait the canvas starts below the top inset (status bar of a standalone PWA);
+ * in landscape it is centred between the left and right insets (notch). Bottom insets are left to the touch UI.
  */
-export function encaixa(janelaW: number, janelaH: number, reservaInferior?: number): Encaixe {
+export function encaixa(janelaW: number, janelaH: number, reservaInferior?: number, margens?: Margens): Encaixe {
   const retrato = reservaInferior !== undefined && janelaH > janelaW;
-  const dispW = Math.max(0, janelaW);
-  const dispH = Math.max(0, retrato ? janelaH - (reservaInferior ?? 0) : janelaH);
+  const m = margens ?? { t: 0, r: 0, b: 0, l: 0 };
+  const sup = janelaH > janelaW ? Math.max(0, m.t) : 0;
+  const esqM = janelaH > janelaW ? 0 : Math.max(0, m.l), dirM = janelaH > janelaW ? 0 : Math.max(0, m.r);
+  const dispW = Math.max(0, janelaW - esqM - dirM);
+  const dispH = Math.max(0, (retrato ? janelaH - (reservaInferior ?? 0) : janelaH) - sup);
   let largura: number, altura: number;
   if (dispW * ALTURA_TELA <= dispH * LARGURA_TELA) { // width-bound
     largura = dispW; altura = (dispW * ALTURA_TELA) / LARGURA_TELA;
   } else {                                           // height-bound
     altura = dispH; largura = (dispH * LARGURA_TELA) / ALTURA_TELA;
   }
-  const esquerda = (janelaW - largura) / 2;
-  const topo = retrato ? 0 : (dispH - altura) / 2;
+  const esquerda = esqM + (dispW - largura) / 2;
+  const topo = sup + (retrato ? 0 : (dispH - altura) / 2);
   return { escala: largura / LARGURA_TELA, largura, altura, esquerda, topo };
 }
 

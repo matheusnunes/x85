@@ -68,8 +68,14 @@ export interface Partida {
   quadro: number;
 }
 
-/** Current/last game (null from the start of jogo_tela() until "ready" is dismissed). */
-export const jogoAtual: { p: Partida | null; carregando: boolean } = { p: null, carregando: false };
+/**
+ * Current/last game (null from the start of jogo_tela() until "ready" is dismissed). `rodando` is true only while
+ * the gameplay loop proper runs (not on the loading/ready screen, not during the fades around it).
+ */
+export const jogoAtual: { p: Partida | null; carregando: boolean; rodando: boolean } = { p: null, carregando: false, rodando: false };
+
+/** Web addition (touch UI): the gameplay loop proper is running — Esc (⏸ on touch) only means something then. */
+export function emPartida(): boolean { return jogoAtual.rodando && g.estado_atual === TELA_JOGO; }
 
 // orig: jogo.cpp:36 jogo_carrega
 // F12: the ready screen is cleared and redrawn (loading + ready) every frame instead of drawing ready once onto
@@ -197,6 +203,7 @@ export function* jogo_tela(): Generator<void, number, void> {
   const temp_pts = { v: 0 };
 
   jogoAtual.p = null;
+  jogoAtual.rodando = false;
   yield* jogo_carrega();
 
   const teclado = C2D2_PegaTeclas();
@@ -253,160 +260,165 @@ export function* jogo_tela(): Generator<void, number, void> {
   let segura_mouse = mouse.botoes[C2D2_MESQUERDO].ativo || mouse.botoes[C2D2_MESQUERDO].pressionado;
   let abortou = false;
 
-  while (!g.encerra) {
-    if (g.estado_atual !== TELA_JOGO)
-      g.encerra = 1;
+  jogoAtual.rodando = true;
+  try {
+    while (!g.encerra) {
+      if (g.estado_atual !== TELA_JOGO)
+        g.encerra = 1;
 
-    if (teclado[K.ESC].pressionado) {
-      g.estado_atual = TELA_MISSION;
-      abortou = true; // F15
-    }
-
-    // F14: the original dereferenced Boss unconditionally (NULL when the map has no M_BOSS → crash); without a
-    // boss the phase ends, as a win, once the map scroll is over.
-    const semBoss = Boss < 0;
-    if ((semBoss ? fase.ymapa <= -600 : marcas[Boss].tipo === INVALIDO) || jogador.energia <= 0) {
-      //lógica de liberação de fases e save só entra uma vez
-      if (p.contadorfinal === 0) {
-        //matou o boss.. pasou de fase
-        if (semBoss ? jogador.energia > 0 : marcas[Boss].energia <= 0) {
-          if ((g.saveAtual.planeta_liberado === g.saveAtual.planeta_atual) && g.saveAtual.planeta_liberado < 4)
-            g.saveAtual.planeta_liberado++;
-
-          g.saveAtual.pts = (g.saveAtual.pts + temp_pts.v) | 0;
-          menu_saves_saveslot(g.slotAtual);
-          menu_recordes_insere(g.saveAtual.pts, g.saveAtual.nome);
-        }
-
-        //zera pontos;
-        temp_pts.v = 0;
-        menu_saves_loadslot(g.slotAtual);
+      if (teclado[K.ESC].pressionado) {
+        g.estado_atual = TELA_MISSION;
+        abortou = true; // F15
       }
 
-      if (p.contadorfinal < 200)
-        p.contadorfinal++;
-      else g.estado_atual = TELA_MISSION;
+      // F14: the original dereferenced Boss unconditionally (NULL when the map has no M_BOSS → crash); without a
+      // boss the phase ends, as a win, once the map scroll is over.
+      const semBoss = Boss < 0;
+      if ((semBoss ? fase.ymapa <= -600 : marcas[Boss].tipo === INVALIDO) || jogador.energia <= 0) {
+        //lógica de liberação de fases e save só entra uma vez
+        if (p.contadorfinal === 0) {
+          //matou o boss.. pasou de fase
+          if (semBoss ? jogador.energia > 0 : marcas[Boss].energia <= 0) {
+            if ((g.saveAtual.planeta_liberado === g.saveAtual.planeta_atual) && g.saveAtual.planeta_liberado < 4)
+              g.saveAtual.planeta_liberado++;
+
+            g.saveAtual.pts = (g.saveAtual.pts + temp_pts.v) | 0;
+            menu_saves_saveslot(g.slotAtual);
+            menu_recordes_insere(g.saveAtual.pts, g.saveAtual.nome);
+          }
+
+          //zera pontos;
+          temp_pts.v = 0;
+          menu_saves_loadslot(g.slotAtual);
+        }
+
+        if (p.contadorfinal < 200)
+          p.contadorfinal++;
+        else g.estado_atual = TELA_MISSION;
+      }
+
+      /*Troca tiros.. */
+      if (teclado[K.LALT].pressionado) {
+        jogo_troca_tiro(jogador); // F11
+        p.informacao = 180;
+      }
+
+      //        if(teclado[C2D2_2].pressionado) ... — "next weapon" commented out in the original (jogo.cpp:236-240)
+
+      jogo_atualiza_fundo(yfundo1, yfundo2);
+      jogo_atualiza_estrela(estrelas, 1, MAXSTARS);
+      jogo_atualiza_jogador(jogador, explos);
+      jogo_atualiza_barras(altura_energia, jogador);
+      jogo_atualiza_explosao(explos);
+      jogo_atualiza_tiro(tiros, jogador);
+      jogo_atualiza_marca(marcas, fase.ymapa, jogador, explos, somExplo, tiros, temp_pts);
+      jogo_testa_colisao(marcas, tiros, spMarca, spTiro, jogador, temp_pts);
+
+      if (jogador.intervalo_tiro > 0) jogador.intervalo_tiro--;
+
+      if (fase.ymapa > -600) fase.ymapa -= 2;
+
+      if (quadroFlame > 1) quadroFlame--;
+      else quadroFlame = 24;
+
+      // F13: release (or a new press edge) of the dismissing input re-arms it
+      if (segura_espaco && (!teclado[K.ESPACO].ativo || (p.quadro > 0 && teclado[K.ESPACO].pressionado))) segura_espaco = false;
+      if (segura_mouse && (!mouse.botoes[C2D2_MESQUERDO].ativo || (p.quadro > 0 && mouse.botoes[C2D2_MESQUERDO].pressionado))) segura_mouse = false;
+      const lmb = mouse.botoes[C2D2_MESQUERDO].ativo && !segura_mouse;
+      const espaco = (teclado[K.ESPACO].pressionado || teclado[K.ESPACO].ativo) && !segura_espaco;
+
+      if ((lmb || espaco) && jogador.intervalo_tiro <= 0 && jogador.tipo !== INVALIDO) {
+        CA2_TocaEfeitoTela(somTiro[jogador.tiro_atual], jogador.x);
+        jogo_cria_tiro(tiros, jogador, jogador.tiro_atual);
+      }
+
+      if (teclado[K.LCTRL].pressionado && jogador.tipo !== INVALIDO && jogador.n_bombas > 0) {
+        CA2_TocaEfeitoTela(somTiro[BOMBA1], jogador.x);
+        jogo_cria_tiro(tiros, jogador, jogador.bomba_atual);
+        jogador.n_bombas--;
+      }
+
+      //joga valor de saveAtual.pts em uma string para que possa ser desenhado
+      spontos = formataPontos(temp_pts.v + g.saveAtual.pts);
+
+      /*--------------------------------------------------------------------------------------*/
+      /*-----------------    FIM DAS LOGICAS E COMECO DO DESENHO    --------------------------*/
+      /*--------------------------------------------------------------------------------------*/
+
+      C2D2_LimpaTela();
+
+      //desenha fundo
+      C2D2_DesenhaSprite(spFundo, 0, 0, Math.trunc(yfundo1.v));
+      C2D2_DesenhaSprite(spFundo, 0, 0, Math.trunc(yfundo2.v));
+      C2D2P_Pontos(estrelas, 100, 200, 200, 200);
+
+      if (jogador.tipo !== INVALIDO)
+        C2D2_DesenhaSprite(spFlame, quadroFlame, jogador.x + 9, jogador.y + 45);
+      //desenha a nave
+      if (jogador.tipo === X85)
+        C2D2_DesenhaSprite(spX85, 0, jogador.x, jogador.y);
+      else if (jogador.tipo === INVUNERAVEL)
+        C2D2_DesenhaSprite(spX85, 1, jogador.x, jogador.y);
+
+      //desenha tiros
+      for (let i = 0; i < MAXTIROS; i++) {
+        const t = tiros[i];
+        const meio = Math.trunc(t.tamanho / 2);
+        if (t.tipo === TIRO1)
+          XDesenhaSprite(spTiro[TIRO1], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIRO2)
+          XDesenhaSprite(spTiro[TIRO2], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIRO3)
+          XDesenhaSprite(spTiro[TIRO3], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIRO4)
+          XDesenhaSprite(spTiro[TIRO4], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIRO5)
+          XDesenhaSprite(spTiro[TIRO5], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIRO6)
+          XDesenhaSprite(spTiro[TIRO6], 0, t.x - meio, t.y, t.tamanho, t.tamanho * 2, t.alpha);
+        else if (t.tipo === BOMBA1)
+          XDesenhaSprite(spTiro[BOMBA1], 0, t.x, t.y, 800, 600, t.alpha);
+        else if (t.tipo === TIROINI1)
+          XDesenhaSprite(spTiro[TIROINI1], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIROINI2)
+          XDesenhaSprite(spTiro[TIROINI2], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
+        else if (t.tipo === TIROINI3)
+          XDesenhaSprite(spTiro[TIROINI3], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
+      }
+
+      //desenha todas marcas ativas
+      for (let i = 0; i < MAXMARCAS; i++) {
+        if (marcas[i].tipo !== INVALIDO && marcas[i].ativo)
+          C2D2_DesenhaSprite(spMarca[marcas[i].tipo], 0, marcas[i].x, marcas[i].y);
+      }
+      //desenha explosoes
+      for (let i = 0; i < MAXEXPLOS; i++) {
+        const e = explos[i];
+        if (e.tipo !== INVALIDO)
+          XDesenhaSprite(spExplo, 0, e.x - Math.trunc(e.tamanho / 2), e.y - Math.trunc(e.tamanho / 2), e.tamanho, e.tamanho, e.alpha);
+      }
+
+      //desenha barras de vida e escudo e bombas
+      C2D2_DesenhaSprite(barras_back, 0, 0, 0);
+      if (jogador.energia > 0)
+        XDesenhaSprite(barras_energy, 0, 6, 595, 16, Math.trunc((-altura_energia.v * 586) / 100), 255);
+      for (let i = 0; i < jogador.n_bombas; i++)
+        C2D2_DesenhaSprite(barras_bomba, 0, 774, 116 - (i * 26));
+      //desenha saveAtual.pts
+      C2D2_DesenhaTexto(fontejogo, 40, 0, spontos, C2D2_TEXTO_ESQUERDA);
+
+      //informacao
+      if (p.informacao >= 0) {
+        p.informacao--;
+        jogo_exibe_informacao(jogador.tiro_atual);
+      }
+
+      C2D2_Sincroniza();
+      p.quadro++;
+      yield;
     }
-
-    /*Troca tiros.. */
-    if (teclado[K.LALT].pressionado) {
-      jogo_troca_tiro(jogador); // F11
-      p.informacao = 180;
-    }
-
-    //        if(teclado[C2D2_2].pressionado) ... — "next weapon" commented out in the original (jogo.cpp:236-240)
-
-    jogo_atualiza_fundo(yfundo1, yfundo2);
-    jogo_atualiza_estrela(estrelas, 1, MAXSTARS);
-    jogo_atualiza_jogador(jogador, explos);
-    jogo_atualiza_barras(altura_energia, jogador);
-    jogo_atualiza_explosao(explos);
-    jogo_atualiza_tiro(tiros, jogador);
-    jogo_atualiza_marca(marcas, fase.ymapa, jogador, explos, somExplo, tiros, temp_pts);
-    jogo_testa_colisao(marcas, tiros, spMarca, spTiro, jogador, temp_pts);
-
-    if (jogador.intervalo_tiro > 0) jogador.intervalo_tiro--;
-
-    if (fase.ymapa > -600) fase.ymapa -= 2;
-
-    if (quadroFlame > 1) quadroFlame--;
-    else quadroFlame = 24;
-
-    // F13: release (or a new press edge) of the dismissing input re-arms it
-    if (segura_espaco && (!teclado[K.ESPACO].ativo || (p.quadro > 0 && teclado[K.ESPACO].pressionado))) segura_espaco = false;
-    if (segura_mouse && (!mouse.botoes[C2D2_MESQUERDO].ativo || (p.quadro > 0 && mouse.botoes[C2D2_MESQUERDO].pressionado))) segura_mouse = false;
-    const lmb = mouse.botoes[C2D2_MESQUERDO].ativo && !segura_mouse;
-    const espaco = (teclado[K.ESPACO].pressionado || teclado[K.ESPACO].ativo) && !segura_espaco;
-
-    if ((lmb || espaco) && jogador.intervalo_tiro <= 0 && jogador.tipo !== INVALIDO) {
-      CA2_TocaEfeitoTela(somTiro[jogador.tiro_atual], jogador.x);
-      jogo_cria_tiro(tiros, jogador, jogador.tiro_atual);
-    }
-
-    if (teclado[K.LCTRL].pressionado && jogador.tipo !== INVALIDO && jogador.n_bombas > 0) {
-      CA2_TocaEfeitoTela(somTiro[BOMBA1], jogador.x);
-      jogo_cria_tiro(tiros, jogador, jogador.bomba_atual);
-      jogador.n_bombas--;
-    }
-
-    //joga valor de saveAtual.pts em uma string para que possa ser desenhado
-    spontos = formataPontos(temp_pts.v + g.saveAtual.pts);
-
-    /*--------------------------------------------------------------------------------------*/
-    /*-----------------    FIM DAS LOGICAS E COMECO DO DESENHO    --------------------------*/
-    /*--------------------------------------------------------------------------------------*/
-
-    C2D2_LimpaTela();
-
-    //desenha fundo
-    C2D2_DesenhaSprite(spFundo, 0, 0, Math.trunc(yfundo1.v));
-    C2D2_DesenhaSprite(spFundo, 0, 0, Math.trunc(yfundo2.v));
-    C2D2P_Pontos(estrelas, 100, 200, 200, 200);
-
-    if (jogador.tipo !== INVALIDO)
-      C2D2_DesenhaSprite(spFlame, quadroFlame, jogador.x + 9, jogador.y + 45);
-    //desenha a nave
-    if (jogador.tipo === X85)
-      C2D2_DesenhaSprite(spX85, 0, jogador.x, jogador.y);
-    else if (jogador.tipo === INVUNERAVEL)
-      C2D2_DesenhaSprite(spX85, 1, jogador.x, jogador.y);
-
-    //desenha tiros
-    for (let i = 0; i < MAXTIROS; i++) {
-      const t = tiros[i];
-      const meio = Math.trunc(t.tamanho / 2);
-      if (t.tipo === TIRO1)
-        XDesenhaSprite(spTiro[TIRO1], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIRO2)
-        XDesenhaSprite(spTiro[TIRO2], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIRO3)
-        XDesenhaSprite(spTiro[TIRO3], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIRO4)
-        XDesenhaSprite(spTiro[TIRO4], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIRO5)
-        XDesenhaSprite(spTiro[TIRO5], 0, t.x - meio, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIRO6)
-        XDesenhaSprite(spTiro[TIRO6], 0, t.x - meio, t.y, t.tamanho, t.tamanho * 2, t.alpha);
-      else if (t.tipo === BOMBA1)
-        XDesenhaSprite(spTiro[BOMBA1], 0, t.x, t.y, 800, 600, t.alpha);
-      else if (t.tipo === TIROINI1)
-        XDesenhaSprite(spTiro[TIROINI1], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIROINI2)
-        XDesenhaSprite(spTiro[TIROINI2], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
-      else if (t.tipo === TIROINI3)
-        XDesenhaSprite(spTiro[TIROINI3], 0, t.x, t.y, t.tamanho, t.tamanho, t.alpha);
-    }
-
-    //desenha todas marcas ativas
-    for (let i = 0; i < MAXMARCAS; i++) {
-      if (marcas[i].tipo !== INVALIDO && marcas[i].ativo)
-        C2D2_DesenhaSprite(spMarca[marcas[i].tipo], 0, marcas[i].x, marcas[i].y);
-    }
-    //desenha explosoes
-    for (let i = 0; i < MAXEXPLOS; i++) {
-      const e = explos[i];
-      if (e.tipo !== INVALIDO)
-        XDesenhaSprite(spExplo, 0, e.x - Math.trunc(e.tamanho / 2), e.y - Math.trunc(e.tamanho / 2), e.tamanho, e.tamanho, e.alpha);
-    }
-
-    //desenha barras de vida e escudo e bombas
-    C2D2_DesenhaSprite(barras_back, 0, 0, 0);
-    if (jogador.energia > 0)
-      XDesenhaSprite(barras_energy, 0, 6, 595, 16, Math.trunc((-altura_energia.v * 586) / 100), 255);
-    for (let i = 0; i < jogador.n_bombas; i++)
-      C2D2_DesenhaSprite(barras_bomba, 0, 774, 116 - (i * 26));
-    //desenha saveAtual.pts
-    C2D2_DesenhaTexto(fontejogo, 40, 0, spontos, C2D2_TEXTO_ESQUERDA);
-
-    //informacao
-    if (p.informacao >= 0) {
-      p.informacao--;
-      jogo_exibe_informacao(jogador.tiro_atual);
-    }
-
-    C2D2_Sincroniza();
-    p.quadro++;
-    yield;
+  } finally {
+    jogoAtual.rodando = false;
   }
   // F15: Esc from the game reloads the slot (the original skipped it, jogo.cpp:199-200), so unlocks picked up
   // in the aborted run are discarded like on death. After a win/death the slot was already saved/reloaded.

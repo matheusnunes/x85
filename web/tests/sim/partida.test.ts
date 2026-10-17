@@ -7,7 +7,7 @@ import { K } from '../../src/engine/input';
 import { dadosDeTeste, memStorage } from '../unit/fixture';
 import * as M from '../../src/game/funcoes_M';
 import { menu_carrega } from '../../src/game/menu';
-import { jogo_tela, jogo_troca_tiro, jogoAtual, fase } from '../../src/game/jogo';
+import { jogo_tela, jogo_troca_tiro, jogoAtual, fase, emPartida } from '../../src/game/jogo';
 import { principal } from '../../src/game/principal';
 import { novoNave } from '../../src/game/tipos';
 import {
@@ -59,12 +59,14 @@ test('loading frame, then loading + ready redrawn every frame until Space (F12);
     expect(h.backend.limpezas).toBe(limpezas + 1);
     expect(q.map(x => [x.tex, x.dx, x.dy])).toEqual([[tex('./dados/jogo/loading.jpg'), 0, 0], [tex('./dados/jogo/ready.png'), 180, 440]]);
     expect(jogoAtual.p).toBeNull();
+    expect(emPartida()).toBe(false); // touch ⏸ stays hidden on the ready screen (Esc is a no-op there)
   }
   up(K.ESC);
   expect(M.g.estado_atual).toBe(TELA_JOGO);
   down(K.ESPACO); frame(g);
   expect(jogoAtual.p).not.toBeNull();
   expect(jogoAtual.p!.quadro).toBe(1);
+  expect(emPartida()).toBe(true);
 });
 
 test('scripted run: fire, bomb, weapon info, Esc → MISSION with the slot reloaded (F13, F15)', () => {
@@ -89,7 +91,6 @@ test('scripted run: fire, bomb, weapon info, Esc → MISSION with the slot reloa
   expect(p.jogador.energia).toBeGreaterThan(0);
   expect(max).toBeGreaterThan(0);
   expect(p.temp_pts.v).toBeGreaterThan(0);
-  // HUD score text is drawn with the 32-px font from x=40
   // bomb: LCtrl press edge, 5 → 4, one BOMBA1 in the pool
   expect(p.jogador.n_bombas).toBe(5);
   down(K.LCTRL); frame(g); up(K.LCTRL); frame(g);
@@ -119,12 +120,11 @@ test('scripted run: fire, bomb, weapon info, Esc → MISSION with the slot reloa
   while (!r.done && i++ < 5) r = frame(g);
   expect(r.done).toBe(true);
   expect(r.value).toBe(0);
+  expect(emPartida()).toBe(false);
   expect(M.g.encerra).toBe(1);
   const salvo = M.menu_saves_carregavetor()[0];
-  expect(M.g.saveAtual.tiro_liberado).toEqual(salvo.tiro_liberado);
-  expect(M.g.saveAtual.pts).toBe(salvo.pts);
-  expect(M.g.saveAtual.planeta_liberado).toBe(salvo.planeta_liberado);
-  expect(M.g.saveAtual.planeta_atual).toBe(salvo.planeta_atual);
+  // menu_saves_loadslot copies every field but `level` (funcoes_M.cpp:229-236), so that one is taken as is
+  expect(M.g.saveAtual).toEqual({ ...salvo, level: M.g.saveAtual.level });
   expect(M.g.saveAtual.nome).toBe('tester');
   expect(M.g.saveAtual.tiro_liberado[1]).toBe(false);
 });

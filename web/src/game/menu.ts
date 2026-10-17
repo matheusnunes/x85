@@ -7,7 +7,7 @@ import {
   CA2_CarregaEfeito, CA2_CarregaMusica, CA2_TocaMusica, CA2_TocaEfeito, CA2_AjustaVolume, K,
 } from '../engine/c2d2';
 import {
-  g, XDesenhaSprite, XDesenhaBotao, planetas_atualiza, atualiza_barra, menu_recordes_default, recordes,
+  g, HOTSPOT, XDesenhaSprite, XDesenhaBotao, planetas_atualiza, atualiza_barra, menu_recordes_default, recordes,
   menu_saves_default, menu_saves_carregavetor, menu_saves_loadslot, menu_saves_edit, opcoes_carrega, opcoes_grava,
 } from './funcoes_M';
 import {
@@ -326,12 +326,38 @@ export function* menu_ranking(): Tela {
   }
 }
 
+// D10 (web addition, Ruling R19): credits page shown by menu_about after the original about1/about2 art.
+// Drawn with the menu font (512.png, size 32 — it has the Latin-1 accented glyphs) over the same background.
+export const CREDITOS: readonly string[] = [
+  'CRÉDITOS',
+  'X85 (2010) - Matheus Gobato Nunes',
+  '',
+  'Música do menu: Recharge - alvys18',
+  'newgrounds.com/audio/listen/348628',
+  'Música do jogo: Esprit - SasquaMox',
+  'newgrounds.com/audio/listen/347665',
+  '(CC BY-NC 3.0)',
+  'Engine original: Chien2D 2',
+  'Versão web: 2026',
+];
+// web: the framed panel of the about screen (inside cover.png, right of the back button botback at x 8..73),
+// where a click switches pages; credits are centred in it
+const PAINEL_X0 = 80, PAINEL_X1 = 775, PAINEL_Y0 = 104, PAINEL_Y1 = 527;
+const PAINEL_CX = Math.trunc((PAINEL_X0 + PAINEL_X1) / 2);
+/** Web addition (R19): about page shown — 0 = original art, 1 = credits. Exported for tests. */
+export const paginaAbout = { v: 0 };
+
 // orig: menu.cpp:399 menu_about
 export function* menu_about(): Tela {
   // vetor com alpha de cada botão usado pela XDesenhaBotao
   const balpha = novoBalpha();
   let about_alpha = 0;
   let about_alpha_inc = true;
+  // web (D10, R19): the original screen has a single page; a click on the panel, Space or ←/→ switches between
+  // it and the credits page (the mission screen's keys), so the original art is shown first and untouched
+  const teclado = C2D2_PegaTeclas();
+  const mouse = C2D2_PegaMouse();
+  paginaAbout.v = 0;
 
   while (!g.encerra) {
     if (g.estado_atual !== TELA_ABOUT)
@@ -354,8 +380,25 @@ export function* menu_about(): Tela {
       g.estado_atual = TELA_MAIN;
     }
 
-    C2D2_DesenhaSprite(spabout1, 0, 200, 100);
-    XDesenhaSprite(spabout2, 0, 200, 100, 0, 0, about_alpha);
+    // web (D10, R19): page switch — click point is mouse + HOTSPOT, as in XDesenhaBotao
+    const px = mouse.x + HOTSPOT.x, py = mouse.y + HOTSPOT.y;
+    const cliquePainel = mouse.botoes[0].pressionado
+      && px >= PAINEL_X0 && px < PAINEL_X1 && py >= PAINEL_Y0 && py < PAINEL_Y1;
+    if (g.estado_atual === TELA_ABOUT && !g.fadecontrol
+      && (cliquePainel || teclado[K.ESPACO].pressionado || teclado[K.ESQUERDA].pressionado || teclado[K.DIREITA].pressionado)) {
+      paginaAbout.v ^= 1;
+      CA2_TocaEfeito(sombot2, 0);
+    }
+
+    if (paginaAbout.v === 0) {
+      C2D2_DesenhaSprite(spabout1, 0, 200, 100);
+      XDesenhaSprite(spabout2, 0, 200, 100, 0, 0, about_alpha);
+      C2D2_DesenhaTexto(fonte, PAINEL_X1 - 10, 488, 'créditos >', C2D2_TEXTO_DIREITA);
+    } else {
+      for (let i = 0; i < CREDITOS.length; i++)
+        if (CREDITOS[i] !== '') C2D2_DesenhaTexto(fonte, PAINEL_CX, 112 + 37 * i, CREDITOS[i], C2D2_TEXTO_CENTRALIZADO);
+      C2D2_DesenhaTexto(fonte, PAINEL_X1 - 10, 488, '< sobre', C2D2_TEXTO_DIREITA);
+    }
 
     //esse é o menu da esquerda
     menu_aux();

@@ -136,6 +136,8 @@ export function jogo_inicia_jogador(jogador: Nave): void {
   jogador.tiro_atual = TIRO1;
   jogador.bomba_atual = BOMBA1;
   jogador.n_bombas = 5;    // F1 — orig: funcoes_J.cpp:102 n_bombas=50 (debug value)
+  // web port: a touch nudge left over from the previous game (or the ready screen) must not move the new ship
+  alvoPendente.dx = 0; alvoPendente.dy = 0; alvoPendente.pendente = false;
 }
 
 // orig: funcoes_J.cpp:105 jogo_cria_tiro(Tiro *tiro, Nave *jogador, int tipo_tiro)
@@ -599,8 +601,12 @@ export function posicao_colisao_tiro(t: Readonly<Tiro>, sprite: number): [number
 export function jogo_testa_colisao(marcas: Marca[], tiros: Tiro[], spMarca: number[], spTiro: number[], jogador: Nave, _score: { v: number }): void {
   for (let i = 0; i < MAXTIROS; i++) {
     const t = tiros[i];
-    // F9: where the shot's native mask is tested (TIRO3–6 centred on the quad jogo.cpp draws)
-    const [tx, ty] = posicao_colisao_tiro(t, spTiro[t.tipo]);
+    // web port (perf): an invalid shot can only matter for i == 0 (the contact test below); for i != 0 every
+    // branch of the original loop body is dead for it, so it is skipped — same result, ~0.6 ms/frame less.
+    if (t.tipo === INVALIDO && i !== 0) continue;
+    // F9: where the shot's native mask is tested (TIRO3–6 centred on the quad jogo.cpp draws; others at x,y)
+    let tx = t.x, ty = t.y;
+    if (t.tipo >= TIRO3 && t.tipo <= TIRO6) [tx, ty] = posicao_colisao_tiro(t, spTiro[t.tipo]);
 
     //testa tiros dos inimigos no jogador
     // F8 — orig: funcoes_J.cpp:743 this test was an `else if` inside the marks loop, guarded by

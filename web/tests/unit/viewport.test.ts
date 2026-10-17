@@ -22,3 +22,20 @@ test('pointer mapping clamps and truncates at the edges', () => {
     }
   }
 });
+test('safe areas: portrait canvas starts below the top inset, landscape is centred between the side insets; mapping stays exact', () => {
+  const ins = { t: 47, r: 0, b: 34, l: 0 };
+  const p = encaixa(390, 844, 260, ins);
+  expect(p.topo).toBe(47); expect(p.largura).toBe(390); expect(p.esquerda).toBe(0);
+  expect(p.topo + p.altura).toBeLessThanOrEqual(844 - 260);
+  const l = encaixa(844, 390, 260, { t: 0, r: 47, b: 21, l: 47 });
+  expect(l.altura).toBe(390); expect(l.topo).toBe(0);                      // bottom inset left to the touch UI
+  expect(l.esquerda).toBeGreaterThanOrEqual(47); expect(l.esquerda + l.largura).toBeLessThanOrEqual(844 - 47);
+  const a = encaixa(700, 390, undefined, { t: 0, r: 0, b: 0, l: 80 });   // asymmetric: shifted right of the inset
+  expect(a.esquerda).toBeCloseTo(80 + (620 - a.largura) / 2, 6);
+  expect(encaixa(1280, 800, undefined, { t: 0, r: 0, b: 0, l: 0 })).toEqual(encaixa(1280, 800)); // desktop unchanged
+  for (const e of [p, l, a]) {
+    expect(paraLogico(e, e.esquerda + e.largura / 2, e.topo + e.altura / 2)).toEqual({ x: 400, y: 300 });
+    expect(paraLogico(e, e.esquerda + 0.5 * e.escala, e.topo + 0.5 * e.escala)).toEqual({ x: 0, y: 0 });
+    expect(paraLogico(e, e.esquerda + 799.5 * e.escala, e.topo + 599.5 * e.escala)).toEqual({ x: 799, y: 599 });
+  }
+});
