@@ -1,0 +1,42 @@
+# Netlify build for the X85 web port (the site lives in web/).
+[build]
+  base = "web"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Vite's content-hashed JS/CSS bundles (vite.config.ts: build.assetsDir = "bundle"): safe to cache forever.
+[[headers]]
+  for = "/bundle/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Game data (images, masks, maps, audio, manifest.json): copied verbatim from public/, file names are NOT hashed,
+# so only a short cache. Edited assets show up within a day.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Entry points must revalidate so a new deploy is picked up immediately.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Security headers. The page has one inline <style> block (style-src 'unsafe-inline') and no inline or eval'd script.
+# Music is an <audio> element (same origin) routed through Web Audio; effects are fetch()ed and decoded.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
