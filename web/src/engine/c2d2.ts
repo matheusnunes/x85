@@ -29,6 +29,8 @@ export function bindEntrada(e: Entrada): void { entrada = e; }
 export function C2D2_PegaTeclas(): Botao[] { return entrada.teclas; }
 // orig: chien2d2.cpp:681 C2D2_PegaMouse
 export function C2D2_PegaMouse(): Mouse { return entrada.mouse; }
+/** Web addition: characters typed this frame through the OS keyboard (#texto on mobile); empty on desktop. */
+export function C2D2_PegaDigitados(): string[] { return entrada.typed; }
 
 // orig: main.cpp:6 C2D2_Inicia(800, 600, C2D2_JANELA, C2D2_DESENHO_OPENGL, "X85") — set up by main.ts; no-op here
 export function C2D2_Inicia(_largura?: number, _altura?: number, _modo?: number, _desenho?: number, _titulo?: string): boolean { return true; }
