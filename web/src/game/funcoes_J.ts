@@ -2,11 +2,17 @@
 // bosses, items and collisions. orig: X85-devcore 2/funcoes_J.cpp (all), funcoes_J.h
 // C semantics: int / int → Math.trunc, int stores → | 0, C float stores → Math.fround.
 // Pointers become object/array references; `int *x` / `int &x` become `{ v: number }`.
-// Intentional behaviour changes (web/FIXES.md): F1, F2 (Task 11).
-import { C2D2_PegaTeclas, K, rand } from '../engine/c2d2';
+// Intentional behaviour changes (web/FIXES.md): F1, F2, F3, F7, F8, F9, F10 — each marked `// F<n>` below.
 import {
-  INVALIDO, X85, EXPLOSAO, MAXTIROS, MAXEXPLOS,
+  C2D2_PegaTeclas, K, rand, C2D2_ColidiuSprites, C2D2_PegaSpriteSet, CA2_TocaEfeitoTela,
+  C2D2M_PrimeiroBlocoMarca, C2D2M_ProximoBlocoMarca,
+} from '../engine/c2d2';
+import { g } from './funcoes_M';
+import {
+  INVALIDO, X85, EXPLOSAO, MAXTIROS, MAXMARCAS, MAXEXPLOS,
   TIRO1, TIRO2, TIRO3, TIRO4, TIRO5, TIRO6, BOMBA1, TIROINI1, TIROINI2, TIROINI3,
+  M_INIMIGO1, M_INIMIGO2, M_INIMIGO3, M_INIMIGO4, M_METEORO, M_BOSS, M_T1, M_T2, M_T3, M_T4, M_T5, M_T6,
+  INIMIGO1, INIMIGO2, INIMIGO3, INIMIGO4, METEORO, BOSS1, BOSS2, BOSS3, BOSS4, BOSS5, T1, T2, T3, T4, T5, T6,
 } from './constantes';
 import type { Nave, Tiro, Marca, Explo } from './tipos';
 
@@ -258,6 +264,448 @@ export function jogo_atualiza_tiro(tiro: Tiro[], jogador: Nave): void {
         if (t.x < jogador.x + 10) t.x = (t.x + Math.trunc((jogador.x - t.x) / 80) + 1) | 0;
         if (t.x > jogador.x + 10) t.x = (t.x - (Math.trunc((t.x - jogador.x) / 80) + 1)) | 0;
         t.y += 3;
+      }
+    }
+  }
+}
+
+// orig: funcoes_J.cpp:321 jogo_procura_marca(unsigned int mapa, int marcacao, Marca *marcas, int &contadormarcas)
+// Appends every mark `marcacao` of the map (row-major) to vetmarca[contadormarcas..] and initialises it.
+export function jogo_procura_marca(mapa: number, marcacao: number, vetmarca: Marca[], contadormarcas: { v: number }): void {
+  // C2D2M_PrimeiroBlocoMarca/ProximoBlocoMarca write x,y into marcas[contadormarcas] only on success
+  let p = C2D2M_PrimeiroBlocoMarca(mapa, marcacao);
+  if (p) {
+    while (p && contadormarcas.v < MAXMARCAS) { // bound: the C code would overflow marcas[MAXMARCAS] (never reached)
+      vetmarca[contadormarcas.v].x = p.x;
+      vetmarca[contadormarcas.v].y = p.y;
+      jogo_inicia_marca(vetmarca, contadormarcas.v, marcacao);
+      contadormarcas.v++;
+      p = C2D2M_ProximoBlocoMarca(mapa);
+    }
+  }
+}
+
+// orig: funcoes_J.cpp:336 jogo_inicia_marca(Marca *marcas, int contadormarcas, unsigned int tipo)
+export function jogo_inicia_marca(marcas: Marca[], contadormarcas: number, tipo: number): void {
+  const m = marcas[contadormarcas];
+  m.tipo = tipo;
+  m.angulo = Math.fround(90);
+  m.ativo = 0;
+  m.estado_atual = 0;
+  m.tempotiro = 0;
+
+  switch (tipo) {
+    case M_INIMIGO1:
+      m.tipo = INIMIGO1;
+      m.energia = 200;
+      break;
+    case M_INIMIGO2:
+      m.tipo = INIMIGO2;
+      m.energia = 300;
+      break;
+    case M_INIMIGO3:
+      m.tipo = INIMIGO3;
+      m.energia = 400;
+      break;
+    case M_INIMIGO4:
+      m.tipo = INIMIGO4;
+      m.energia = 500;
+      break;
+    case M_METEORO:
+      m.tipo = METEORO;
+      m.energia = 750;
+      break;
+    case M_BOSS:
+      switch (g.saveAtual.planeta_atual) {
+        case 0:
+          m.tipo = BOSS1;
+          m.energia = 10000;
+          break;
+        case 1:
+          m.tipo = BOSS2;
+          m.energia = 20000;
+          break;
+        case 2:
+          m.tipo = BOSS3;
+          m.energia = 30000;
+          break;
+        case 3:
+          m.tipo = BOSS4;
+          m.energia = 30000;
+          break;
+        case 4:
+          m.tipo = BOSS5;
+          m.energia = 40000;
+          break;
+      }
+      break;
+    case M_T1:
+      m.tipo = T1;
+      break;
+    case M_T2:
+      m.tipo = T2;
+      break;
+    case M_T3:
+      m.tipo = T3;
+      break;
+    case M_T4:
+      m.tipo = T4;
+      break;
+    case M_T5:
+      m.tipo = T5;
+      break;
+    case M_T6:
+      m.tipo = T6;
+      break;
+  }
+}
+
+const F008 = Math.fround(0.08); // orig: funcoes_J.cpp:438,502,552,579,606,637 the float literal 0.08f
+
+const DOIS_PI = 2 * Math.PI;
+
+// orig: `if(marcas[i].angulo <360) marcas[i].angulo += 0.08f; else marcas[i].angulo = 0;`
+// (funcoes_J.cpp:438-439, 502-503, 552-553, 579-580, 606-607, 637-638) — float accumulator.
+// F10: the reset to 0 (360 rad is not a multiple of 2π, so the orbit jumped after ~56 s) becomes a wrap
+// modulo 2π that still advances by 0.08f. Below 360 the accumulation is bit-identical to the original.
+function passo_angulo(m: Marca): void {
+  if (m.angulo < 360) m.angulo = Math.fround(m.angulo + F008);
+  else m.angulo = Math.fround(Math.fround(m.angulo + F008) % DOIS_PI);
+}
+
+// orig: funcoes_J.cpp:413 jogo_atualiza_marca(Marca *marcas, int ymapa, Nave *jogador, Explo *explos,
+//                                             unsigned int somExplo, Tiro *tiros, int *score)
+// sin/cos take the float angle promoted to double (math.h), and the (int) casts truncate.
+export function jogo_atualiza_marca(marcas: Marca[], ymapa: number, jogador: Nave, explos: Explo[], somExplo: number, tiros: Tiro[], score: { v: number }): void {
+  for (let i = 0; i < MAXMARCAS; i++) {
+    const m = marcas[i];
+    if (m.tipo !== INVALIDO) {
+      if (m.ativo && (m.y > 700)) {
+        m.ativo = 0;
+        m.tipo = INVALIDO; // senão da merda ( acredite ! )
+      } else if (!m.ativo && m.y - ymapa >= -100) {
+        //ta criado mano !
+        m.ativo = 1;
+        m.y = (m.y - ymapa) | 0;
+        m.centroX = m.x;
+        m.centroY = m.y;
+      } else if (m.ativo === 1) {
+        switch (m.tipo) {
+          case INIMIGO1:
+            m.y = Math.trunc(m.centroY + 50 * Math.sin(m.angulo));
+            m.x = Math.trunc(m.centroX + 100 * Math.cos(m.angulo));
+            passo_angulo(m);
+            m.centroY += 2;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x + 35, m.y + 35, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 200;
+            }
+            if (m.tempotiro <= 0) {
+              jogo_cria_tiro_inimigo(tiros, m, TIROINI1);
+              m.tempotiro = 100;
+            } else m.tempotiro--;
+            break;
+
+          case INIMIGO2:
+            if (jogador.tipo !== INVALIDO) {
+              if (m.x < jogador.x + 10) m.x = (m.x + Math.trunc((jogador.x - m.x) / 80) + 1) | 0;
+              if (m.x > jogador.x + 10) m.x = (m.x - (Math.trunc((m.x - jogador.x) / 80) + 1)) | 0;
+              if (m.y < jogador.y - 50) m.y = (m.y + Math.trunc((jogador.y - m.y) / 80) + 1) | 0;
+              if (m.y > jogador.y - 50) m.y = (m.y - (Math.trunc((m.y - jogador.y) / 80) + 1)) | 0;
+            } else
+              m.y += 2;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x + 20, m.y + 20, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 300;
+            }
+            if (m.tempotiro <= 0) {
+              jogo_cria_tiro_inimigo(tiros, m, TIROINI2);
+              m.tempotiro = 50;
+            } else m.tempotiro--;
+            break;
+
+          case INIMIGO3:
+            m.y += 2;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x + 30, m.y + 50, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 400; // F3 — orig: funcoes_J.cpp:489 `score+=400;` moved the pointer: the kill was worth 0
+            }
+            if (m.tempotiro <= 0) {
+              jogo_cria_tiro_inimigo(tiros, m, TIROINI3);
+              m.tempotiro = 180;
+            } else m.tempotiro--;
+            break;
+
+          case INIMIGO4:
+            m.y = Math.trunc(m.centroY + 40 * Math.sin(m.angulo));
+            m.x = Math.trunc(m.centroX + 40 * Math.cos(m.angulo));
+            passo_angulo(m);
+            //marcas[i].centroY +=2;
+
+            if (jogador.tipo !== INVALIDO) {
+              if (m.centroX < jogador.x + 10) m.centroX += 3;
+              if (m.centroX > jogador.x + 10) m.centroX -= 3;
+              if (m.centroY < jogador.y - 200) m.centroY += 3;
+              if (m.centroY > jogador.y - 200) m.centroY -= 3;
+            } else
+              m.y += 2;
+
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x + 30, m.y + 42, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 500;
+            }
+            if (m.tempotiro <= 0) {
+              jogo_cria_tiro_inimigo(tiros, m, TIROINI3);
+              m.tempotiro = 80;
+            } else m.tempotiro--;
+            break;
+
+          case METEORO:
+            m.y += 2;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x + 30, m.y + 30, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 1000;
+            }
+            break;
+
+          case BOSS1:
+          case BOSS2:
+          case BOSS3:
+          case BOSS4:
+            // orig: funcoes_J.cpp:542-657 — four identical copies except the firing pattern
+            if (m.y <= 50 && m.estado_atual === 0) m.y++;
+            else if (m.estado_atual === 0) {
+              m.centroY = m.y;
+              m.estado_atual = 1;
+            } else {
+              m.y = Math.trunc(m.centroY + 20 * Math.sin(m.angulo));
+              m.x = Math.trunc(m.centroX + 50 * Math.cos(m.angulo));
+              passo_angulo(m);
+            }
+            if (m.tempotiro <= 0) {
+              if (m.tipo === BOSS1) {        // orig: funcoes_J.cpp:555-558
+                jogo_cria_tiro_inimigo(tiros, m, TIROINI1);
+                m.tempotiro = 30;
+              } else if (m.tipo === BOSS2) { // orig: funcoes_J.cpp:582-585
+                jogo_cria_tiro_inimigo(tiros, m, TIROINI2);
+                m.tempotiro = 30;
+              } else if (m.tipo === BOSS3) { // orig: funcoes_J.cpp:609-616
+                const tirob = rand() % 2;
+                if (tirob === 1)
+                  jogo_cria_tiro_inimigo(tiros, m, TIROINI1);
+                else
+                  jogo_cria_tiro_inimigo(tiros, m, TIROINI2);
+                m.tempotiro = 45;
+              } else {                       // BOSS4 — orig: funcoes_J.cpp:640-647
+                const tirob = rand() % 2;
+                if (tirob === 1)
+                  jogo_cria_tiro_inimigo(tiros, m, TIROINI2);
+                else
+                  jogo_cria_tiro_inimigo(tiros, m, TIROINI3);
+                m.tempotiro = 40;
+              }
+            } else m.tempotiro--;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x, m.y - 25, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 3000;
+            }
+            break;
+
+          case BOSS5:
+            if (m.y <= 50) m.y++;
+            m.x = 800 - jogador.x;
+            if (m.energia <= 0) {
+              m.tipo = INVALIDO;
+              jogo_cria_explosao(m.x, m.y - 25, explos);
+              CA2_TocaEfeitoTela(somExplo, m.x);
+              score.v += 3000;
+            }
+            if (m.tempotiro <= 0) {
+              const tirob = rand() % 3;
+              if (tirob === 0)
+                jogo_cria_tiro_inimigo(tiros, m, TIROINI3);
+              else if (tirob === 1)
+                jogo_cria_tiro_inimigo(tiros, m, TIROINI2);
+              else
+                jogo_cria_tiro_inimigo(tiros, m, TIROINI1);
+
+              m.tempotiro = 25;
+            } else m.tempotiro--;
+            break;
+
+          case T2: m.y += 1; break;
+          case T3: m.y += 1; break;
+          case T4: m.y += 1; break;
+          case T5: m.y += 1; break;
+          case T6: m.y += 1; break;
+        }
+      }
+    }
+  }
+}
+
+/**
+ * F9 — top-left at which a player shot's native-size mask is tested. The original tested every shot at (x,y)
+ * (funcoes_J.cpp:704), but jogo.cpp:308-315 draws TIRO3–TIRO5 as a t×t quad and TIRO6 as t×2t at (x - t/2, y),
+ * so the hit area sat right/down of the visual. Now the native mask's centre is placed on the drawn quad's
+ * centre. TIRO1/TIRO2/BOMBA1/enemy shots are drawn at native size at (x,y) and are unchanged.
+ */
+export function posicao_colisao_tiro(t: Readonly<Tiro>, sprite: number): [number, number] {
+  if (t.tipo < TIRO3 || t.tipo > TIRO6) return [t.x, t.y];
+  const s = C2D2_PegaSpriteSet(sprite);
+  if (!s) return [t.x, t.y];
+  // orig: jogo.cpp:309-315 XDesenhaSprite(sp, 0, x - tamanho/2, y, tamanho, tamanho | tamanho*2, alpha)
+  const dx = t.x - Math.trunc(t.tamanho / 2), dy = t.y;
+  let dw = t.tamanho, dh = t.tipo === TIRO6 ? t.tamanho * 2 : t.tamanho;
+  if (dw === 0 || dh === 0) { dw = s.spLargura; dh = s.spAltura; } // XDesenhaSprite: 0 → native size
+  return [dx + Math.trunc((dw - s.spLargura) / 2), dy + Math.trunc((dh - s.spAltura) / 2)];
+}
+
+// orig: funcoes_J.cpp:694 jogo_testa_colisao(Marca *marcas, Tiro *tiros, unsigned int *spMarca, unsigned int *spTiro,
+//                                            Nave *jogador, int *score)
+// Loop order is kept: it decides which mark absorbs a shot (the first active one in array order).
+export function jogo_testa_colisao(marcas: Marca[], tiros: Tiro[], spMarca: number[], spTiro: number[], jogador: Nave, _score: { v: number }): void {
+  for (let i = 0; i < MAXTIROS; i++) {
+    const t = tiros[i];
+    // F9: where the shot's native mask is tested (TIRO3–6 centred on the quad jogo.cpp draws)
+    const [tx, ty] = posicao_colisao_tiro(t, spTiro[t.tipo]);
+
+    //testa tiros dos inimigos no jogador
+    // F8 — orig: funcoes_J.cpp:743 this test was an `else if` inside the marks loop, guarded by
+    // `marcas[j].tipo != INVALIDO && marcas[j].ativo` (:700): with no active mark, enemy shots passed through
+    // the ship. It now runs once per shot. (Energy changes commute and nothing else here reads them, so the
+    // result is the original one whenever some mark is active.)
+    if (t.tipo >= TIROINI1 && t.tipo <= TIROINI3 && jogador.tipo === X85
+      && C2D2_ColidiuSprites(spTiro[t.tipo], 0, t.x, t.y, jogador.sprite, 0, jogador.x, jogador.y)) {
+      switch (t.tipo) {
+        case TIROINI1:
+          jogador.energia -= 15;
+          t.tipo = INVALIDO;
+          break;
+        case TIROINI2:
+          jogador.energia -= 5;
+          t.tipo = INVALIDO;
+          break;
+        case TIROINI3:
+          jogador.energia -= 15;
+          t.tipo = INVALIDO;
+          break;
+      }
+    }
+
+    for (let j = 0; j < MAXMARCAS; j++) {
+      const m = marcas[j];
+      //verifica se tiro e marca são validos e ativos
+      if (m.tipo !== INVALIDO && t.tipo !== INVALIDO && m.ativo) {
+        //testa colisões tiros do jogador com todos inimigos
+        if (t.tipo <= BOMBA1 && m.tipo >= INIMIGO1 && m.tipo <= BOSS5
+          && C2D2_ColidiuSprites(spTiro[t.tipo], 0, tx, ty, spMarca[m.tipo], 0, m.x, m.y)) {
+          switch (t.tipo) {
+            case TIRO1:
+              m.energia -= 50;
+              t.tipo = INVALIDO;
+              break;
+            case TIRO2:
+              m.energia -= 75;
+              t.tipo = INVALIDO;
+              break;
+            case TIRO3:
+              m.energia -= 100;
+              t.tipo = INVALIDO;
+              break;
+            case TIRO4:
+              m.energia -= 75;
+              t.tipo = INVALIDO;
+              break;
+            case TIRO5:
+              m.energia -= 120;
+              t.tipo = INVALIDO;
+              break;
+            case TIRO6:
+              m.energia -= 150;
+              t.tipo = INVALIDO;
+              break;
+            case BOMBA1:
+              if (t.alpha >= 250)
+                m.energia -= 1000;
+              break;
+          }
+          //Faz o calculo da pontuação baseado no tipo do tiro e na energia atual do jogador
+          //if(marcas[j].tipo != BOSS)
+          //   *score += (int)(10*tiros[i].tipo + (0.1*jogador->energia));
+        }
+        // (else if: enemy shot vs player — moved above the marks loop, F8)
+      }
+      //o I tem que ser zero, e os tiros podem ser invalidos pra testar uma vez só a colisão dos inimigos e itens no jogador
+      if (i === 0 && m.tipo >= INIMIGO1 && m.tipo <= T6 && m.ativo && jogador.tipo === X85
+        && C2D2_ColidiuSprites(spMarca[m.tipo], 0, m.x, m.y, jogador.sprite, 0, jogador.x, jogador.y)) {
+        switch (m.tipo) {
+          case INIMIGO1:
+            jogador.energia -= 20;
+            m.energia -= 9999;
+            break;
+          case INIMIGO2:
+            jogador.energia -= 30;
+            m.energia -= 9999;
+            break;
+          case INIMIGO3:
+            jogador.energia -= 40;
+            m.energia -= 9999;
+            break;
+          case INIMIGO4: // F7 — orig: funcoes_J.cpp:781 `case INIMIGO4: break;` (passed through harmlessly);
+            //               now the INIMIGO3 contact branch's numbers
+            jogador.energia -= 40;
+            m.energia -= 9999;
+            break;
+          case METEORO:
+            jogador.energia -= 50;
+            m.energia -= 9999;
+            break;
+
+          case BOSS1: jogador.energia -= 100; break;
+          case BOSS2: jogador.energia -= 100; break;
+          case BOSS3: jogador.energia -= 100; break;
+          case BOSS4: jogador.energia -= 100; break;
+          case BOSS5: jogador.energia -= 100; break;
+
+          case T2:
+            g.saveAtual.tiro_liberado[1] = true;
+            jogador.tiro_atual = TIRO2;
+            m.tipo = INVALIDO;
+            break;
+          case T3:
+            g.saveAtual.tiro_liberado[2] = true;
+            jogador.tiro_atual = TIRO3;
+            m.tipo = INVALIDO;
+            break;
+          case T4:
+            g.saveAtual.tiro_liberado[3] = true;
+            jogador.tiro_atual = TIRO4;
+            m.tipo = INVALIDO;
+            break;
+          case T5:
+            g.saveAtual.tiro_liberado[4] = true;
+            jogador.tiro_atual = TIRO5;
+            m.tipo = INVALIDO;
+            break;
+          case T6:
+            g.saveAtual.tiro_liberado[5] = true;
+            jogador.tiro_atual = TIRO6;
+            m.tipo = INVALIDO;
+            break;
+        }
       }
     }
   }
