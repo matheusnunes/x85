@@ -9,14 +9,30 @@
   <style>
     html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;
       -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-    #palco{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-    #tela{display:block;cursor:none;image-rendering:auto;background:#000}
+    #palco{position:fixed;left:0;top:0;right:0;bottom:0;margin:0;padding:0}
+    #tela{display:block;position:absolute;cursor:none;image-rendering:auto;background:#000}
     #texto{position:fixed;left:-1000px;top:0;opacity:0;width:1px;height:1px}
+    #splash{position:fixed;inset:0;background:#000;z-index:20;cursor:pointer;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#c8c8c8}
+    #splash[hidden],#pausa[hidden]{display:none}
+    #splash-logo{position:absolute;height:auto}
+    #splash-texto{position:absolute;text-align:center;letter-spacing:.04em}
+    #splash-texto.pisca{animation:pisca 1.2s steps(2,start) infinite}
+    @keyframes pisca{to{visibility:hidden}}
+    #pausa{position:fixed;z-index:15;background:rgba(0,0,0,.6);color:#e8e8e8;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:.6em;cursor:pointer;
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:clamp(14px,3vmin,28px)}
+    #pausa b{font-size:1.8em;letter-spacing:.2em}
+    #fps{position:fixed;z-index:30;pointer-events:none;font:11px/1 ui-monospace,Menlo,Consolas,monospace;
+      color:#fff;opacity:.55;background:rgba(0,0,0,.35);padding:2px 4px;border-radius:3px}
   </style>
 </head>
 <body>
   <div id="palco"><canvas id="tela" width="800" height="600"></canvas></div>
   <div id="touch-root"></div>
+  <div id="pausa" hidden><b>PAUSA</b><span>Clique / toque ou tecle para continuar</span></div>
+  <div id="splash"><img id="splash-logo" src="./assets/dados/menu/x85.jpg" alt="X85" draggable="false" /><div id="splash-texto">Carregando…</div></div>
+  <div id="fps">-- fps</div>
   <input id="texto" type="text" maxlength="14" autocomplete="off" autocapitalize="off" spellcheck="false" />
   <script type="module" src="./src/main.ts"></script>
 </body>

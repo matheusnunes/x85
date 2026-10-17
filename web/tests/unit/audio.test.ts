@@ -1,7 +1,7 @@
 import { test, expect, vi } from 'vitest';
 import {
   ganhosPan, initAudio, CA2_CarregaEfeito, CA2_TocaEfeito, CA2_TocaEfeitoTela, CA2_AjustaVolume,
-  CA2_CarregaMusica, CA2_TocaMusica, desbloqueiaAudio, portaSilenciosa, type AudioPort,
+  CA2_CarregaMusica, CA2_TocaMusica, CA2_PausaMusica, CA2_ContinuaMusica, desbloqueiaAudio, portaSilenciosa, type AudioPort,
 } from '../../src/engine/audio';
 
 const fake = (unlocked = true) => {
@@ -131,4 +131,17 @@ test('a rejected unlock warns instead of being swallowed', async () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]).toContain(erro);
   } finally { warn.mockRestore(); }
+});
+
+test('CA2_PausaMusica / CA2_ContinuaMusica forward to the port (R11); ports without them are a no-op', async () => {
+  const f = fake(); const chamadas: string[] = [];
+  f.port.pausaMusica = () => { chamadas.push('pausa'); };
+  f.port.continuaMusica = () => { chamadas.push('continua'); };
+  await initAudio(f.port, man);
+  CA2_PausaMusica(); CA2_ContinuaMusica();
+  expect(chamadas).toEqual(['pausa', 'continua']);
+  const semPausa = fake(); await initAudio(semPausa.port, man);
+  expect(() => { CA2_PausaMusica(); CA2_ContinuaMusica(); }).not.toThrow();
+  await initAudio(portaSilenciosa(), man);
+  expect(() => { CA2_PausaMusica(); CA2_ContinuaMusica(); }).not.toThrow();
 });

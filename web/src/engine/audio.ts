@@ -17,6 +17,10 @@ export interface AudioPort {
   desbloqueado(): boolean;
   /** Optional: create the track's element early so desbloqueia() can bless it inside the user gesture (iOS). */
   preparaMusica?(urlM4a: string, urlOgg: string): void;
+  /** Optional (Ruling R11): pause the current track where it is; a later musica() or continuaMusica() clears it. */
+  pausaMusica?(): void;
+  /** Optional (Ruling R11): resume the paused track from where it stopped (on unlock if still locked). */
+  continuaMusica?(): void;
 }
 
 // orig: SDL_mixer default channel count (Mix_AllocateChannels is never called)
@@ -143,6 +147,12 @@ export function CA2_TocaMusica(id: number, vezes: number): void {
   porta.musica(e.m4a, e.ogg, ganhoVolume(volMusica), vezes <= -1);
 }
 
+// orig: chienaudio2.cpp:495 CA2_PausaMusica — Mix_PauseMusic (used by the web pause overlay, Ruling R11)
+export function CA2_PausaMusica(): void { porta?.pausaMusica?.(); }
+
+// orig: chienaudio2.cpp:504 CA2_ContinuaMusica — Mix_ResumeMusic
+export function CA2_ContinuaMusica(): void { porta?.continuaMusica?.(); }
+
 // orig: chienaudio2.cpp:149 CA2_AjustaVolume — both 0..100 (clamped), applied to music immediately, effects on next play
 export function CA2_AjustaVolume(musica: number, efeitos_: number): void {
   volMusica = limitaVolume(musica);
@@ -160,6 +170,8 @@ export function portaSilenciosa(): AudioPort {
     volumeMusica: () => {},
     desbloqueia: async () => {},
     desbloqueado: () => true,
+    pausaMusica: () => {},
+    continuaMusica: () => {},
   };
 }
 
@@ -184,6 +196,7 @@ export function criaPortaWebAudio(base = ''): AudioPort {
   const usaM4a = typeof Audio !== 'undefined' && new Audio().canPlayType('audio/mp4; codecs="mp4a.40.2"') !== '';
   let atual: Faixa | null = null;
   let pendente = false; // `atual` was requested while locked
+  let pausada = false;  // CA2_PausaMusica: `atual` stays paused until continuaMusica() or a new musica()
 
   const faixa = (m4a: string, ogg: string): Faixa => {
     const url = junta(base, usaM4a ? m4a : ogg);
@@ -199,7 +212,7 @@ export function criaPortaWebAudio(base = ''): AudioPort {
     return f;
   };
   const tocaAtual = (): void => {
-    if (!atual) return;
+    if (!atual || pausada) return;
     pendente = false;
     atual.el.play().then(() => { if (atual) atual.abencoada = true; }, () => { pendente = true; });
   };
@@ -234,6 +247,7 @@ export function criaPortaWebAudio(base = ''): AudioPort {
     preparaMusica(m4a, ogg) { faixa(m4a, ogg); },
     musica(m4a, ogg, volume, loop = true) {
       ganhoMusica.gain.value = volume;
+      pausada = false;
       const f = faixa(m4a, ogg);
       for (const outra of faixas.values()) if (outra !== f) outra.el.pause();
       atual = f;
@@ -243,6 +257,13 @@ export function criaPortaWebAudio(base = ''): AudioPort {
       if (ctx.state === 'running') tocaAtual(); else pendente = true;
     },
     volumeMusica(v) { ganhoMusica.gain.value = v; },
+    pausaMusica() { pausada = true; atual?.el.pause(); },
+    continuaMusica() {
+      if (!pausada) return;
+      pausada = false;
+      if (!atual) return;
+      if (ctx.state === 'running') tocaAtual(); else pendente = true; // play() resumes from the paused position
+    },
     async desbloqueia() {
       // Inside the user gesture: bless every known track element (iOS plays media only from gestures),
       // then resume the context and start the pending track.
