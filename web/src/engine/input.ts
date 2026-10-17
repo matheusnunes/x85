@@ -31,24 +31,47 @@ export class Entrada {
 
   push(e: Evento): void { this.fila.push(e); }
 
-  /** orig: C2D2_Entrada — clear the one-frame edges, then apply the queued events in order. */
+  /**
+   * orig: C2D2_Entrada (chien2d2.cpp:519-534) — clear the one-frame edges, then apply the queued events in order.
+   * F18: an up / mup for a button that went down in this same poll keeps the press for this frame (pressionado,
+   * ativo) and is carried over to the start of the next poll, together with every later event of that button, so a
+   * click or key tap shorter than one frame is never lost. releaseAll still releases at once (and drops what was
+   * carried over).
+   */
   poll(): void {
     for (const t of this.teclas) { t.pressionado = false; t.liberado = false; }
     for (const b of this.mouse.botoes) { b.pressionado = false; b.liberado = false; }
     this.typed = [];
     const fila = this.fila;
-    this.fila = [];
+    const adiados: Evento[] = [];
+    this.fila = adiados;
+    const baixaram = new Set<number>(); // buttons pressed in this poll (keys: k, mouse: MAXTECLAS + b)
+    const adiar = new Set<number>();    // buttons whose remaining events wait for the next poll
+    // true when the event was carried over to the next poll
+    const segura = (id: number, sobe: boolean, e: Evento): boolean => {
+      if (adiar.has(id) || (sobe && baixaram.has(id))) { adiar.add(id); adiados.push(e); return true; }
+      if (!sobe) baixaram.add(id);
+      return false;
+    };
     for (const e of fila) {
       switch (e.t) {
-        case 'down': pressiona(this.teclas[e.k]); break;
-        case 'up': solta(this.teclas[e.k]); break;
-        case 'mdown': this.mouse.x = e.x; this.mouse.y = e.y; pressiona(this.mouse.botoes[e.b]); break;
-        case 'mup': this.mouse.x = e.x; this.mouse.y = e.y; solta(this.mouse.botoes[e.b]); break;
-        case 'mmove': this.mouse.x = e.x; this.mouse.y = e.y; break;
+        case 'down': if (!segura(e.k, false, e)) pressiona(this.teclas[e.k]); break;
+        case 'up': if (!segura(e.k, true, e)) solta(this.teclas[e.k]); break;
+        case 'mdown':
+          if (!segura(K.MAXTECLAS + e.b, false, e)) { this.mouse.x = e.x; this.mouse.y = e.y; pressiona(this.mouse.botoes[e.b]); }
+          break;
+        case 'mup':
+          if (!segura(K.MAXTECLAS + e.b, true, e)) { this.mouse.x = e.x; this.mouse.y = e.y; solta(this.mouse.botoes[e.b]); }
+          break;
+        case 'mmove': // after a carried-over mup the moves wait too, so the pointer ends where it really is
+          if (adiar.has(K.MAXTECLAS) || adiar.has(K.MAXTECLAS + 1) || adiar.has(K.MAXTECLAS + 2)) adiados.push(e);
+          else { this.mouse.x = e.x; this.mouse.y = e.y; }
+          break;
         case 'char': this.typed.push(e.c); break;
         case 'releaseAll':
           for (const t of this.teclas) if (t.ativo) solta(t);
           for (const b of this.mouse.botoes) if (b.ativo) solta(b);
+          adiados.length = 0; baixaram.clear(); adiar.clear();
           break;
       }
     }

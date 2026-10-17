@@ -83,7 +83,7 @@ export class Relogio {
     await this.passa(80);
   }
 
-  /** Key press held ≥ 1 logic frame (a press and release inside one frame is dropped, as in the original). */
+  /** Key press held ≥ 1 logic frame (a press and release inside one frame also works since F18; this models a real press). */
   async tecla(code: string): Promise<void> {
     await this.page.keyboard.down(code);
     await this.passa(80);

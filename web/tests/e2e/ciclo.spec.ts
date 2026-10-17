@@ -1,7 +1,8 @@
 // Desktop: the full SAIR → start splash → click → MAIN cycle (principal() returns and is started again), the
-// beforeunload guard staying off in the menus (D10), and WebGL context loss / restore (renderer re-uploads textures).
+// beforeunload guard staying off in the menus (D10), WebGL context loss / restore (renderer re-uploads textures), and
+// instant clicks / key taps shorter than one frame (F18).
 import { test, expect, type Page } from '@playwright/test';
-import { abre, coletaErros, esperaEstado, estado, quadro, paraPagina, TELA, BOTAO, HOTSPOT } from './util';
+import { Relogio, abre, coletaErros, esperaEstado, estado, quadro, paraPagina, TELA, BOTAO, HOTSPOT } from './util';
 
 test.skip(({ isMobile }) => isMobile, 'desktop projects only');
 
@@ -98,5 +99,27 @@ test('WebGL context loss → restore: frames keep advancing and drawing resumes,
   // and input still works on the restored context
   await clica(page, ...BOTAO.options);
   await esperaEstado(page, TELA.OPCOES);
+  expect(erros).toEqual([]);
+});
+
+test('F18: an instant click and an instant key tap (down+up inside one frame) are not lost', async ({ page }) => {
+  const erros = coletaErros(page);
+  const r = new Relogio(page);
+  await r.instala();
+  await abre(page);
+  await r.congela();
+  await page.mouse.click(640, 400);
+  await r.passa(100);
+  await r.ateEstado(TELA.MAIN);
+  await r.passa(1000); // fade-in done
+  // the production repro: the clock is frozen, so mousedown and mouseup reach the same poll
+  const [px, py] = await paraPagina(page, BOTAO.start[0] - HOTSPOT.x, BOTAO.start[1] - HOTSPOT.y);
+  await page.mouse.move(px, py);
+  await r.passa(50);
+  await page.mouse.down(); await page.mouse.up();
+  await r.ateEstado(TELA.SLOT_SELECT, 2000);
+  await r.passa(300);
+  await page.keyboard.press('Escape'); // keydown + keyup in the same frame
+  await r.ateEstado(TELA.MAIN, 2000);
   expect(erros).toEqual([]);
 });

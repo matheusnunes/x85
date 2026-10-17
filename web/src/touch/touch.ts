@@ -42,9 +42,10 @@ export function difTexto(antes: string, depois: string): { apagar: number; inser
 type ItemTexto = { bs: true } | { c: string };
 
 /**
- * Turns touch / OS-keyboard activity into input the engine can see. Chien2D edges last one poll, so a down and an
- * up queued for the same poll lose the press (input.test "down+up in the same frame"); quick taps do exactly that.
- * The sequencer holds such an up back until after the next poll. OS-keyboard edits are replayed in order, one
+ * Turns touch / OS-keyboard activity into input the engine can see. Chien2D edges last one poll, so in the original
+ * engine a down and an up queued for the same poll lose the press; quick taps do exactly that. The sequencer holds
+ * such an up back until after the next poll (since F18 Entrada.poll also carries such an up over by itself; the
+ * sequencer's up reaches the queue only after the poll that applied the down, so the two never defer twice). OS-keyboard edits are replayed in order, one
  * Backspace press per frame and characters batched between them. `instala` hooks Entrada.poll for that.
  */
 export class Sequenciador {

@@ -1,5 +1,22 @@
 import { test, expect } from 'vitest';
-import { PassoFixo, MedidorFps } from '../../src/engine/loop';
+import { PassoFixo, MedidorFps, iniciaLoop } from '../../src/engine/loop';
+
+/** A fake window whose rAF is driven by hand at `hz` (render rate). */
+function janela() {
+  let cb: ((t: number) => void) | null = null;
+  const alvo = {
+    document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} },
+    performance: { now: () => 0 },
+    requestAnimationFrame(f: (t: number) => void) { cb = f; return 1; },
+    cancelAnimationFrame() { cb = null; },
+  };
+  const roda = (hz: number, segundos: number, t0 = 0): number => {
+    let t = t0;
+    for (let i = 0; i < hz * segundos; i++) { const f = cb; cb = null; f?.(t); t += 1000 / hz; }
+    return t;
+  };
+  return { alvo: alvo as unknown as Window, roda };
+}
 test('60 Hz on a 120 Hz display steps every other frame', () => {
   let n = 0; const p = new PassoFixo(() => n++); let t = 0;
   for (let i = 0; i < 120; i++) { p.tick(t); t += 1000 / 120; }
@@ -29,4 +46,24 @@ test('MedidorFps reports frames per second over a ~0.5 s window', () => {
   for (let i = 0; i < 120; i++) { m.quadro(t); t += 1000 / 30; }
   expect(m.fps()).toBe(30);
   m.reinicia(); expect(m.fps()).toBe(30); // keeps the last value until a new window completes
+});
+test('MedidorFps counts n frames per call (steps produced by a tick)', () => {
+  const m = new MedidorFps(); let t = 0;
+  for (let i = 0; i < 60; i++) { m.quadro(t, i % 2); t += 1000 / 60; } // 30 produced frames per second
+  expect(m.fps()).toBe(30);
+});
+for (const hz of [60, 120, 144]) {
+  test(`fps() reports the game frame rate (logic steps/s), ~60 on a ${hz} Hz display`, () => {
+    let n = 0; const { alvo, roda } = janela(); const loop = iniciaLoop(new PassoFixo(() => n++), alvo);
+    roda(hz, 3);
+    expect(loop.fps()).toBeGreaterThanOrEqual(59); expect(loop.fps()).toBeLessThanOrEqual(61);
+    expect(n).toBeGreaterThanOrEqual(178); expect(n).toBeLessThanOrEqual(182);
+    loop.stop();
+  });
+}
+test('fps() drops when the game cannot keep up (10 Hz rAF: at most 4 steps per frame → 40)', () => {
+  const { alvo, roda } = janela(); const loop = iniciaLoop(new PassoFixo(() => {}), alvo);
+  roda(10, 3);
+  expect(loop.fps()).toBe(40);
+  loop.stop();
 });

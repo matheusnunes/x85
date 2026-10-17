@@ -30,7 +30,7 @@ async function visibilidade(page: Page, oculta: boolean): Promise<void> {
   }, oculta);
 }
 
-test('gameplay: fire, bomb (X), weapon (Z); hidden tab pauses without catch-up; click resumes', async ({ page, browserName }, info) => {
+test('gameplay: fire, bomb (X), weapon (Z); hidden tab pauses without catch-up; click resumes', async ({ page }, info) => {
   const erros = coletaErros(page);
   await abre(page);
   await page.mouse.click(640, 400);
@@ -85,12 +85,14 @@ test('gameplay: fire, bomb (X), weapon (Z); hidden tab pauses without catch-up; 
     expect(n).toBeGreaterThan(esperado * 0.9);
     expect(n).toBeLessThan(esperado * 1.1 + 2);
   }
-  if (browserName === 'chromium') {
-    // R6: measured render rate — headless chromium paces rAF at ~60 Hz; under heavy parallel load (5 projects on
-    // SwiftShader) a 0.5 s window can dip, so any of the next windows within 55..65 passes
-    await expect.poll(() => page.evaluate(() => window.__x85!.fps()), { timeout: 10_000, intervals: [500] })
-      .toBeGreaterThanOrEqual(55);
-    expect(await page.evaluate(() => window.__x85!.fps())).toBeLessThanOrEqual(65);
+  {
+    // R6 + post-deploy fix: the counter shows the GAME frame rate (logic steps produced per second, 0.5 s window),
+    // not the display's rAF rate, so it reads ~60 on any engine / display; under heavy parallel load (5 projects on
+    // SwiftShader) a window can dip, so any of the next windows within 55..65 passes
+    await expect.poll(async () => {
+      const f = await page.evaluate(() => window.__x85!.fps());
+      return f >= 55 && f <= 65;
+    }, { timeout: 10_000, intervals: [500] }).toBe(true);
     await expect(page.locator('#fps')).toHaveText(/^\d+ fps$/);
   }
 

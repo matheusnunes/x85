@@ -104,10 +104,25 @@ test('a tap whose down and up land in the same frame still produces a press edge
   expect(e.teclas[K.LCTRL]).toEqual({ pressionado: true, ativo: true, liberado: false });
   e.poll();
   expect(e.teclas[K.LCTRL]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  e.poll();
+  expect(e.teclas[K.LCTRL]).toEqual({ pressionado: false, ativo: false, liberado: false }); // exactly one press / one release
   solta();
-  // uninstalled: the original poll is back (down+up in one frame loses the press again)
+  // uninstalled: the plain poll is back; since F18 it keeps the press of a down+up in one frame by itself
   e.push({ t: 'down', k: K.LALT }); e.push({ t: 'up', k: K.LALT }); e.poll();
-  expect(e.teclas[K.LALT].pressionado).toBe(false);
+  expect(e.teclas[K.LALT].pressionado).toBe(true);
+  e.poll(); expect(e.teclas[K.LALT].liberado).toBe(true);
+});
+
+test('sequencer + engine deferral do not double-defer: a quick tap releases after exactly one poll (F18)', () => {
+  const e = new Entrada(); const s = new Sequenciador(e); s.instala();
+  const linha: string[] = [];
+  const le = () => { const b = e.mouse.botoes[0]; linha.push(`${+b.pressionado}${+b.ativo}${+b.liberado}`); };
+  e.push({ t: 'down', k: K.ESPACO }); e.push({ t: 'up', k: K.ESPACO }); // a physical quick key in the same frame
+  s.mouse(true, 10, 10); s.mouse(false, 10, 10);
+  e.poll(); le(); expect(e.teclas[K.ESPACO].pressionado).toBe(true);
+  e.poll(); le(); expect(e.teclas[K.ESPACO].liberado).toBe(true);
+  e.poll(); le(); expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: false });
+  expect(linha).toEqual(['110', '001', '000']);
 });
 
 test('a slow tap is passed through unchanged', () => {

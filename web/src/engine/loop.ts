@@ -52,15 +52,20 @@ export class PassoFixo {
   }
 }
 
-/** Measured render rate: rAF callbacks counted over windows of >= 0.5 s (Ruling R6). */
+/**
+ * Measured game frame rate: frames produced (logic steps — the game draws only inside a step) counted over windows
+ * of >= 0.5 s (Ruling R6). Fed once per rAF callback with the number of steps that callback ran, so it reads ~60 on
+ * 60/120/144 Hz displays (extra rAF callbacks present an identical frame) and drops when the game cannot keep up.
+ */
 export class MedidorFps {
   private inicio: number | null = null;
   private quadros = 0;
   private valor = 0;
 
-  quadro(agoraMs: number): void {
+  /** `n` = frames produced since the previous call (default 1). The first call only opens the window. */
+  quadro(agoraMs: number, n = 1): void {
     if (this.inicio === null) { this.inicio = agoraMs; this.quadros = 0; return; }
-    this.quadros++;
+    this.quadros += n;
     const dt = agoraMs - this.inicio;
     if (dt >= 500) {
       this.valor = Math.round((this.quadros * 1000) / dt);
@@ -78,7 +83,7 @@ export class MedidorFps {
 export interface Loop {
   /** Cancels the rAF loop and removes the visibility listener. */
   stop(): void;
-  /** Measured render fps (rAF rate, 0.5 s window) — not the logic rate, which is always 60 Hz. */
+  /** Measured game fps: logic steps executed per second (0.5 s window) — not the display's rAF rate. */
   fps(): number;
 }
 
@@ -90,8 +95,7 @@ export function iniciaLoop(p: PassoFixo, alvo: Window = window): Loop {
   let ativo = true;
   const quadro = (t: number): void => {
     if (!ativo) return;
-    medidor.quadro(t);
-    p.tick(t);
+    medidor.quadro(t, p.tick(t));
     pedido = alvo.requestAnimationFrame(quadro);
   };
   const onVisibilidade = (): void => {

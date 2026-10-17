@@ -9,9 +9,54 @@ test('press edge lasts one poll', () => {
   expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: true });
   e.poll(); expect(e.teclas[K.ESPACO]).toEqual({ pressionado: false, ativo: false, liberado: false });
 });
-test('down+up in the same frame loses the press (engine semantics)', () => {
+test('down+up in the same frame keeps the press for one poll, the release lands on the next (F18)', () => {
   const e = new Entrada(); e.push({ t: 'down', k: K.LCTRL }); e.push({ t: 'up', k: K.LCTRL }); e.poll();
-  expect(e.teclas[K.LCTRL]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  expect(e.teclas[K.LCTRL]).toEqual({ pressionado: true, ativo: true, liberado: false });
+  e.poll(); expect(e.teclas[K.LCTRL]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  e.poll(); expect(e.teclas[K.LCTRL]).toEqual({ pressionado: false, ativo: false, liberado: false });
+});
+test('quick mouse click (mdown+mup in one frame): press this poll, release next poll (F18)', () => {
+  const e = new Entrada();
+  e.push({ t: 'mdown', b: 0, x: 92, y: 314 }); e.push({ t: 'mup', b: 0, x: 93, y: 315 }); e.poll();
+  expect(e.mouse.botoes[0]).toEqual({ pressionado: true, ativo: true, liberado: false });
+  expect([e.mouse.x, e.mouse.y]).toEqual([92, 314]);
+  e.poll();
+  expect(e.mouse.botoes[0]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  expect([e.mouse.x, e.mouse.y]).toEqual([93, 315]);
+  e.poll(); expect(e.mouse.botoes[0]).toEqual({ pressionado: false, ativo: false, liberado: false });
+  // a move after the quick click waits behind the carried-over mup, so the pointer ends where it really is
+  e.push({ t: 'mdown', b: 0, x: 5, y: 5 }); e.push({ t: 'mup', b: 0, x: 5, y: 5 }); e.push({ t: 'mmove', x: 50, y: 60 }); e.poll();
+  expect([e.mouse.x, e.mouse.y]).toEqual([5, 5]);
+  e.poll(); expect([e.mouse.x, e.mouse.y]).toEqual([50, 60]);
+});
+test('two quick clicks in consecutive frames give two press edges (F18)', () => {
+  const e = new Entrada(); const prensas: boolean[] = [], solturas: boolean[] = [];
+  const clique = () => { e.push({ t: 'mdown', b: 0, x: 1, y: 1 }); e.push({ t: 'mup', b: 0, x: 1, y: 1 }); };
+  clique(); e.poll(); prensas.push(e.mouse.botoes[0].pressionado); solturas.push(e.mouse.botoes[0].liberado);
+  clique(); e.poll(); prensas.push(e.mouse.botoes[0].pressionado); solturas.push(e.mouse.botoes[0].liberado);
+  e.poll(); prensas.push(e.mouse.botoes[0].pressionado); solturas.push(e.mouse.botoes[0].liberado);
+  e.poll(); prensas.push(e.mouse.botoes[0].pressionado); solturas.push(e.mouse.botoes[0].liberado);
+  expect(prensas).toEqual([true, true, false, false]);
+  expect(solturas).toEqual([false, false, true, false]);
+  expect(e.mouse.botoes[0].ativo).toBe(false);
+});
+test('a quick key press does not delay other buttons nor a release of a key held from an earlier poll (F18)', () => {
+  const e = new Entrada(); e.push({ t: 'down', k: K.ESQUERDA }); e.poll();
+  e.push({ t: 'down', k: K.ESPACO }); e.push({ t: 'up', k: K.ESPACO }); e.push({ t: 'up', k: K.ESQUERDA }); e.poll();
+  expect(e.teclas[K.ESPACO].pressionado).toBe(true);
+  expect(e.teclas[K.ESQUERDA]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  e.poll(); expect(e.teclas[K.ESPACO].liberado).toBe(true);
+});
+test('releaseAll still releases immediately and drops a deferred release (F18)', () => {
+  const e = new Entrada();
+  e.push({ t: 'down', k: K.CIMA }); e.push({ t: 'up', k: K.CIMA }); e.push({ t: 'releaseAll' }); e.poll();
+  expect(e.teclas[K.CIMA]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  e.poll(); expect(e.teclas[K.CIMA]).toEqual({ pressionado: false, ativo: false, liberado: false });
+  // a release deferred by an earlier poll is applied before a releaseAll queued after it: one release edge only
+  e.push({ t: 'mdown', b: 0, x: 0, y: 0 }); e.push({ t: 'mup', b: 0, x: 0, y: 0 }); e.poll();
+  e.push({ t: 'releaseAll' }); e.poll();
+  expect(e.mouse.botoes[0]).toEqual({ pressionado: false, ativo: false, liberado: true });
+  e.poll(); expect(e.mouse.botoes[0].liberado).toBe(false);
 });
 test('blur releases all', () => {
   const e = new Entrada(); e.push({ t: 'down', k: K.ESQUERDA }); e.poll();
