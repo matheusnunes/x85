@@ -150,15 +150,23 @@ test('slot insert: empty name → red flash, stays', () => {
   expect(M.menu_saves_carregavetor()[0].empty).toBe(true);
   M.g.estado_atual = TELA_MAIN; ateFim(g);
 });
-test('slot insert: OS keyboard chars ([A-Za-z0-9 ]) are accepted, not doubled with the key, 12-char limit', () => {
+test('slot insert: OS keyboard chars are lowercased, only [a-z ] kept (R15), not doubled with the key, 12-char limit', () => {
   M.g.slotAtual = 0; longe(); const g = abre(TELA_SLOT_INSERT, menu_slot_insert); anda(g, 2);
-  // same physical key press seen as keydown and as an input char in one frame → counted once
+  // same physical key press seen as keydown and as an input char in one frame → counted once, as 'j'
   h.entrada.push({ t: 'down', k: K.J }); h.entrada.push({ t: 'char', c: 'J' }); frame(g); h.entrada.push({ t: 'up', k: K.J });
-  for (const c of ['o', '9', '!', 'é', ' ', 'Z']) h.entrada.push({ t: 'char', c });
+  for (const c of ['o', '9', '!', 'é', ' ', 'Z', '7']) h.entrada.push({ t: 'char', c }); // digits/symbols dropped
   frame(g);
-  h.entrada.push({ t: 'char', c: 'abcdefghij' }); frame(g); // limit reached mid-string
+  h.entrada.push({ t: 'char', c: 'ABCDEFGHIJ' }); frame(g); // limit reached mid-string
   clica(g, OTHER(275, 280));
-  expect(M.menu_saves_carregavetor()[0].nome).toBe('Jo9 Zabcdefg');
+  expect(M.menu_saves_carregavetor()[0].nome).toBe('jo zabcdefgh');
+  ateFim(g);
+});
+test('slot insert: typed J gives j; typed 7 is ignored', () => {
+  M.g.slotAtual = 1; longe(); const g = abre(TELA_SLOT_INSERT, menu_slot_insert); anda(g, 2);
+  h.entrada.push({ t: 'char', c: 'J' }); frame(g);
+  h.entrada.push({ t: 'char', c: '7' }); frame(g);
+  clica(g, OTHER(275, 280));
+  expect(M.menu_saves_carregavetor()[1].nome).toBe('j');
   ateFim(g);
 });
 test('slot insert: at most one key char per frame, in the C order (menu.cpp:664-690)', () => {
@@ -222,12 +230,19 @@ test('options: clear records / clear saves buttons', () => {
 // --- ranking / about ---------------------------------------------------------------------------------
 test('ranking shows the records read on entry', () => {
   M.menu_recordes_insere(123456, 'campeao');
+  expect(M.recordes()[0]).toEqual({ nome: 'campeao', pts: 123456 });
   longe(); const g = abre(TELA_RANKING, menu_ranking); anda(g, 12);
   const n = h.backend.quads.length; frame(g);
   const q = h.backend.quads.slice(n);
-  // first glyph quad of the name row 0 is at y=175 (font cell top), first row is 'campeao'
-  expect(q.some(x => x.dy === 175)).toBe(true);
-  expect(q.some(x => x.dy === 175 + 50 * 6)).toBe(true);
+  const fonteTex = C2D2_PegaSpriteSet(C2D2_CarregaSpriteSet('./dados/menu/512.png', 32, 32))!.tex;
+  // glyph index = byte value: frame origin (c%16*32, c/16*32) on the 16x16 font sheet
+  const linha = (y: number) => q.filter(x => x.tex === fonteTex && x.dy === y).map(x => (x.sy / 32) * 16 + x.sx / 32);
+  const codigos = (t: string) => [...t].map(c => c.charCodeAt(0));
+  // row 0: name (255, 175, ESQUERDA) then points (640, 175, DIREITA); row 6 is the 7th record, 'bill' 600
+  expect(linha(175)).toEqual(codigos('campeao' + '123456'));
+  expect(linha(175 + 50 * 6)).toEqual(codigos('bill' + '600'));
+  const pts0 = q.filter(x => x.tex === fonteTex && x.dy === 175).slice(7);
+  expect(pts0[0].dx).toBeGreaterThan(255); // right-aligned block ends near x=640
   M.g.estado_atual = TELA_MAIN; ateFim(g);
 });
 test('about: glow alpha pulses (0→255 in 51 frames)', () => {

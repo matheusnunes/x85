@@ -531,7 +531,8 @@ const TECLAS_NOME: [K, string][] = [
   [K.X, 'x'], [K.Y, 'y'], [K.W, 'w'], [K.Z, 'z'], [K.ESPACO, ' '],
 ];
 const MAX_NOME = 12;                 // orig: menu.cpp:662 if(indxnome<12)
-const DIGITAVEL = /^[A-Za-z0-9 ]$/;  // web: characters accepted from the OS keyboard (#texto)
+// web: OS keyboard (#texto) chars — lowercased, then only the original alphabet [a-z ] is kept (Ruling R15)
+const DIGITAVEL = /^[a-z ]$/;
 
 // orig: menu.cpp:646 menu_slot_insert
 export function* menu_slot_insert(): Tela {
@@ -554,7 +555,8 @@ export function* menu_slot_insert(): Tela {
       if (digitados.length > 0) {
         // web: characters from the OS keyboard. When any arrive this frame the key chain is skipped, so a
         // physical key that produced both a keydown and an input character is counted once.
-        for (const s of digitados) for (const c of s) {
+        for (const s of digitados) for (const ch of s) {
+          const c = ch.toLowerCase();
           if (indxnome < MAX_NOME && DIGITAVEL.test(c)) { nome += c; indxnome++; }
         }
       } else if (indxnome < MAX_NOME) {
