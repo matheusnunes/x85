@@ -16,6 +16,14 @@ import {
 } from './constantes';
 import type { Nave, Tiro, Marca, Explo } from './tipos';
 
+// B1 (web balance, FIXES.md): player weapon damage = original × PODER_ARMAS, rounded.
+// orig: funcoes_J.cpp:706-737 — TIRO1 50, TIRO2 75, TIRO3 100, TIRO4 75, TIRO5 120, TIRO6 150, BOMBA1 1000
+export const PODER_ARMAS = 1.3;
+const DANO_ORIGINAL: Record<number, number> = { [TIRO1]: 50, [TIRO2]: 75, [TIRO3]: 100, [TIRO4]: 75, [TIRO5]: 120, [TIRO6]: 150, [BOMBA1]: 1000 };
+export const DANO_TIRO: Record<number, number> = Object.fromEntries(
+  Object.entries(DANO_ORIGINAL).map(([tipo, d]) => [tipo, Math.round(d * PODER_ARMAS)]),
+);
+
 // orig: funcoes_J.cpp:3 jogo_atualiza_fundo(float *ypersf1, float *ypersf2)
 export function jogo_atualiza_fundo(ypersf1: { v: number }, ypersf2: { v: number }): void {
   if (ypersf1.v > 0) {
@@ -640,32 +648,17 @@ export function jogo_testa_colisao(marcas: Marca[], tiros: Tiro[], spMarca: numb
           && C2D2_ColidiuSprites(spTiro[t.tipo], 0, tx, ty, spMarca[m.tipo], 0, m.x, m.y)) {
           switch (t.tipo) {
             case TIRO1:
-              m.energia -= 50;
-              t.tipo = INVALIDO;
-              break;
             case TIRO2:
-              m.energia -= 75;
-              t.tipo = INVALIDO;
-              break;
             case TIRO3:
-              m.energia -= 100;
-              t.tipo = INVALIDO;
-              break;
             case TIRO4:
-              m.energia -= 75;
-              t.tipo = INVALIDO;
-              break;
             case TIRO5:
-              m.energia -= 120;
-              t.tipo = INVALIDO;
-              break;
             case TIRO6:
-              m.energia -= 150;
+              m.energia -= DANO_TIRO[t.tipo];
               t.tipo = INVALIDO;
               break;
             case BOMBA1:
               if (t.alpha >= 250)
-                m.energia -= 1000;
+                m.energia -= DANO_TIRO[BOMBA1];
               break;
           }
           //Faz o calculo da pontuação baseado no tipo do tiro e na energia atual do jogador

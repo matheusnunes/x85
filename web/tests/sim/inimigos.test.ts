@@ -91,7 +91,7 @@ test('INIMIGO3 kill scores 400 (F3)', () => {
   expect(C2D2_ColidiuSprites(spTiro[TIRO1], 0, 415, 220, spMarca[INIMIGO3], 0, 400, 200)).toBe(true);
   colisao(w);
   expect(w.tiros[0].tipo).toBe(INVALIDO);
-  expect(m.energia).toBe(1 - 50);
+  expect(m.energia).toBe(1 - 65); // B1: 50 × 1.3
   atualiza(w);
   expect(m.tipo).toBe(INVALIDO);
   expect(w.score.v).toBe(400);
@@ -216,8 +216,8 @@ for (const [tipo, t] of [[TIRO3, 22], [TIRO4, 20], [TIRO5, 40], [TIRO6, 30]] as 
   });
 }
 
-test('player shot damage table and one-mark-per-shot rule (funcoes_J.cpp:706-737)', () => {
-  const dano: [number, number][] = [[TIRO1, 50], [TIRO2, 75]];
+test('player shot damage table (B1: original × 1.3) and one-mark-per-shot rule (funcoes_J.cpp:706-737)', () => {
+  const dano: [number, number][] = [[TIRO1, 65], [TIRO2, 98]];
   for (const [tipo, d] of dano) {
     const w = mundo(); w.jogador.x = 700; w.jogador.y = 520;
     const a = ativa(w.marcas[0], BOSS1, 300, 100, 10000);
@@ -228,8 +228,8 @@ test('player shot damage table and one-mark-per-shot rule (funcoes_J.cpp:706-737
     expect(b.energia).toBe(20000);
     expect(w.tiros[0].tipo).toBe(INVALIDO);
   }
-  // the drawn-centred tiros 3..6 (sizes at full growth) deal 100 / 75 / 120 / 150
-  for (const [tipo, t, d] of [[TIRO3, 22, 100], [TIRO4, 20, 75], [TIRO5, 80, 120], [TIRO6, 30, 150]] as const) {
+  // the drawn-centred tiros 3..6 (sizes at full growth) deal 130 / 98 / 156 / 195 (B1)
+  for (const [tipo, t, d] of [[TIRO3, 22, 130], [TIRO4, 20, 98], [TIRO5, 80, 156], [TIRO6, 30, 195]] as const) {
     const w = mundo(); w.jogador.x = 700; w.jogador.y = 520;
     const a = ativa(w.marcas[0], BOSS1, 300, 100, 10000);
     tiro(w.tiros[0], tipo, 370, 140, t);
@@ -238,18 +238,18 @@ test('player shot damage table and one-mark-per-shot rule (funcoes_J.cpp:706-737
   }
 });
 
-test('bomb deals 1000 to every active enemy only while alpha >= 250, and is not consumed', () => {
+test('bomb deals 1300 (B1) to every active enemy only while alpha >= 250, and is not consumed', () => {
   const w = mundo(); w.jogador.x = 700; w.jogador.y = 520;
   const a = ativa(w.marcas[0], INIMIGO1, 100, 100, 200);
   const b = ativa(w.marcas[1], BOSS3, 300, 50, 30000);
   const item = ativa(w.marcas[2], T3, 500, 100, 0);
   tiro(w.tiros[0], BOMBA1, 0, 0, 800); w.tiros[0].alpha = 250;
   colisao(w);
-  expect([a.energia, b.energia, item.energia]).toEqual([200 - 1000, 30000 - 1000, 0]);
+  expect([a.energia, b.energia, item.energia]).toEqual([200 - 1300, 30000 - 1300, 0]);
   expect(w.tiros[0].tipo).toBe(BOMBA1);
   w.tiros[0].alpha = 245;
   colisao(w);
-  expect(b.energia).toBe(29000);
+  expect(b.energia).toBe(30000 - 1300);
 });
 
 // --- F10 ----------------------------------------------------------------------------------------------------
