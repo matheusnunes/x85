@@ -23,3 +23,16 @@ export function dadosDeTeste(): Dados {
   cache = { manifest, imagens, mascaras, mapas };
   return cache;
 }
+
+/** In-memory Storage (localStorage stand-in) for persistence tests. */
+export function memStorage(): Storage {
+  const m = new Map<string, string>();
+  return {
+    getItem: (k: string) => m.get(k) ?? null,
+    setItem: (k: string, v: string) => { m.set(k, String(v)); },
+    removeItem: (k: string) => { m.delete(k); },
+    clear: () => m.clear(),
+    key: (i: number) => [...m.keys()][i] ?? null,
+    get length() { return m.size; },
+  };
+}
