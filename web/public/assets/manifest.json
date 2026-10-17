@@ -1,0 +1,423 @@
+{
+  "images": {
+    "./dados/jogo/barra_inf.png": {
+      "url": "assets/dados/jogo/barra_inf.png",
+      "w": 400,
+      "h": 63,
+      "mask": "assets/dados/jogo/barra_inf.png.mask"
+    },
+    "./dados/jogo/barras_back.png": {
+      "url": "assets/dados/jogo/barras_back.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/jogo/barras_back.png.mask"
+    },
+    "./dados/jogo/barras_bomba.png": {
+      "url": "assets/dados/jogo/barras_bomba.png",
+      "w": 25,
+      "h": 25,
+      "mask": "assets/dados/jogo/barras_bomba.png.mask"
+    },
+    "./dados/jogo/barras_energy.png": {
+      "url": "assets/dados/jogo/barras_energy.png",
+      "w": 16,
+      "h": 586,
+      "mask": "assets/dados/jogo/barras_energy.png.mask"
+    },
+    "./dados/jogo/explo.png": {
+      "url": "assets/dados/jogo/explo.png",
+      "w": 200,
+      "h": 200,
+      "mask": "assets/dados/jogo/explo.png.mask"
+    },
+    "./dados/jogo/flame.png": {
+      "url": "assets/dados/jogo/flame.png",
+      "w": 200,
+      "h": 200,
+      "mask": "assets/dados/jogo/flame.png.mask"
+    },
+    "./dados/jogo/fundo1.jpg": {
+      "url": "assets/dados/jogo/fundo1.jpg",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/jogo/fundo1.jpg.mask"
+    },
+    "./dados/jogo/inimigos/boss1.png": {
+      "url": "assets/dados/jogo/inimigos/boss1.png",
+      "w": 140,
+      "h": 120,
+      "mask": "assets/dados/jogo/inimigos/boss1.png.mask"
+    },
+    "./dados/jogo/inimigos/boss2.png": {
+      "url": "assets/dados/jogo/inimigos/boss2.png",
+      "w": 120,
+      "h": 120,
+      "mask": "assets/dados/jogo/inimigos/boss2.png.mask"
+    },
+    "./dados/jogo/inimigos/boss3.png": {
+      "url": "assets/dados/jogo/inimigos/boss3.png",
+      "w": 150,
+      "h": 140,
+      "mask": "assets/dados/jogo/inimigos/boss3.png.mask"
+    },
+    "./dados/jogo/inimigos/boss4.png": {
+      "url": "assets/dados/jogo/inimigos/boss4.png",
+      "w": 145,
+      "h": 120,
+      "mask": "assets/dados/jogo/inimigos/boss4.png.mask"
+    },
+    "./dados/jogo/inimigos/boss5.png": {
+      "url": "assets/dados/jogo/inimigos/boss5.png",
+      "w": 60,
+      "h": 60,
+      "mask": "assets/dados/jogo/inimigos/boss5.png.mask"
+    },
+    "./dados/jogo/inimigos/inim1.png": {
+      "url": "assets/dados/jogo/inimigos/inim1.png",
+      "w": 45,
+      "h": 45,
+      "mask": "assets/dados/jogo/inimigos/inim1.png.mask"
+    },
+    "./dados/jogo/inimigos/inim2.png": {
+      "url": "assets/dados/jogo/inimigos/inim2.png",
+      "w": 35,
+      "h": 35,
+      "mask": "assets/dados/jogo/inimigos/inim2.png.mask"
+    },
+    "./dados/jogo/inimigos/inim3.png": {
+      "url": "assets/dados/jogo/inimigos/inim3.png",
+      "w": 45,
+      "h": 62,
+      "mask": "assets/dados/jogo/inimigos/inim3.png.mask"
+    },
+    "./dados/jogo/inimigos/inim4.png": {
+      "url": "assets/dados/jogo/inimigos/inim4.png",
+      "w": 45,
+      "h": 57,
+      "mask": "assets/dados/jogo/inimigos/inim4.png.mask"
+    },
+    "./dados/jogo/inimigos/meteoro.png": {
+      "url": "assets/dados/jogo/inimigos/meteoro.png",
+      "w": 150,
+      "h": 75,
+      "mask": "assets/dados/jogo/inimigos/meteoro.png.mask"
+    },
+    "./dados/jogo/itens/T1.png": {
+      "url": "assets/dados/jogo/itens/T1.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T1.png.mask"
+    },
+    "./dados/jogo/itens/T2.png": {
+      "url": "assets/dados/jogo/itens/T2.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T2.png.mask"
+    },
+    "./dados/jogo/itens/T3.png": {
+      "url": "assets/dados/jogo/itens/T3.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T3.png.mask"
+    },
+    "./dados/jogo/itens/T4.png": {
+      "url": "assets/dados/jogo/itens/T4.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T4.png.mask"
+    },
+    "./dados/jogo/itens/T5.png": {
+      "url": "assets/dados/jogo/itens/T5.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T5.png.mask"
+    },
+    "./dados/jogo/itens/T6.png": {
+      "url": "assets/dados/jogo/itens/T6.png",
+      "w": 40,
+      "h": 40,
+      "mask": "assets/dados/jogo/itens/T6.png.mask"
+    },
+    "./dados/jogo/loading.jpg": {
+      "url": "assets/dados/jogo/loading.jpg",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/jogo/loading.jpg.mask"
+    },
+    "./dados/jogo/nave.png": {
+      "url": "assets/dados/jogo/nave.png",
+      "w": 120,
+      "h": 60,
+      "mask": "assets/dados/jogo/nave.png.mask"
+    },
+    "./dados/jogo/ready.png": {
+      "url": "assets/dados/jogo/ready.png",
+      "w": 441,
+      "h": 68,
+      "mask": "assets/dados/jogo/ready.png.mask"
+    },
+    "./dados/jogo/tiros/bomba.png": {
+      "url": "assets/dados/jogo/tiros/bomba.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/jogo/tiros/bomba.png.mask"
+    },
+    "./dados/jogo/tiros/tiro1.png": {
+      "url": "assets/dados/jogo/tiros/tiro1.png",
+      "w": 15,
+      "h": 15,
+      "mask": "assets/dados/jogo/tiros/tiro1.png.mask"
+    },
+    "./dados/jogo/tiros/tiro2.png": {
+      "url": "assets/dados/jogo/tiros/tiro2.png",
+      "w": 30,
+      "h": 15,
+      "mask": "assets/dados/jogo/tiros/tiro2.png.mask"
+    },
+    "./dados/jogo/tiros/tiro3.png": {
+      "url": "assets/dados/jogo/tiros/tiro3.png",
+      "w": 30,
+      "h": 30,
+      "mask": "assets/dados/jogo/tiros/tiro3.png.mask"
+    },
+    "./dados/jogo/tiros/tiro4.png": {
+      "url": "assets/dados/jogo/tiros/tiro4.png",
+      "w": 30,
+      "h": 30,
+      "mask": "assets/dados/jogo/tiros/tiro4.png.mask"
+    },
+    "./dados/jogo/tiros/tiro5.png": {
+      "url": "assets/dados/jogo/tiros/tiro5.png",
+      "w": 80,
+      "h": 80,
+      "mask": "assets/dados/jogo/tiros/tiro5.png.mask"
+    },
+    "./dados/jogo/tiros/tiro6.png": {
+      "url": "assets/dados/jogo/tiros/tiro6.png",
+      "w": 15,
+      "h": 30,
+      "mask": "assets/dados/jogo/tiros/tiro6.png.mask"
+    },
+    "./dados/jogo/tiros/tiroini1.png": {
+      "url": "assets/dados/jogo/tiros/tiroini1.png",
+      "w": 8,
+      "h": 8,
+      "mask": "assets/dados/jogo/tiros/tiroini1.png.mask"
+    },
+    "./dados/jogo/tiros/tiroini2.png": {
+      "url": "assets/dados/jogo/tiros/tiroini2.png",
+      "w": 8,
+      "h": 8,
+      "mask": "assets/dados/jogo/tiros/tiroini2.png.mask"
+    },
+    "./dados/jogo/tiros/tiroini3.png": {
+      "url": "assets/dados/jogo/tiros/tiroini3.png",
+      "w": 8,
+      "h": 8,
+      "mask": "assets/dados/jogo/tiros/tiroini3.png.mask"
+    },
+    "./dados/menu/512.png": {
+      "url": "assets/dados/menu/512.png",
+      "w": 512,
+      "h": 512,
+      "mask": "assets/dados/menu/512.png.mask"
+    },
+    "./dados/menu/about1.png": {
+      "url": "assets/dados/menu/about1.png",
+      "w": 534,
+      "h": 401,
+      "mask": "assets/dados/menu/about1.png.mask"
+    },
+    "./dados/menu/about2.png": {
+      "url": "assets/dados/menu/about2.png",
+      "w": 534,
+      "h": 401,
+      "mask": "assets/dados/menu/about2.png.mask"
+    },
+    "./dados/menu/botback.png": {
+      "url": "assets/dados/menu/botback.png",
+      "w": 130,
+      "h": 445,
+      "mask": "assets/dados/menu/botback.png.mask"
+    },
+    "./dados/menu/botdelslot.png": {
+      "url": "assets/dados/menu/botdelslot.png",
+      "w": 62,
+      "h": 124,
+      "mask": "assets/dados/menu/botdelslot.png.mask"
+    },
+    "./dados/menu/botmain.png": {
+      "url": "assets/dados/menu/botmain.png",
+      "w": 262,
+      "h": 124,
+      "mask": "assets/dados/menu/botmain.png.mask"
+    },
+    "./dados/menu/botplanetas.png": {
+      "url": "assets/dados/menu/botplanetas.png",
+      "w": 220,
+      "h": 140,
+      "mask": "assets/dados/menu/botplanetas.png.mask"
+    },
+    "./dados/menu/cover.png": {
+      "url": "assets/dados/menu/cover.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/cover.png.mask"
+    },
+    "./dados/menu/cursor.png": {
+      "url": "assets/dados/menu/cursor.png",
+      "w": 80,
+      "h": 40,
+      "mask": "assets/dados/menu/cursor.png.mask"
+    },
+    "./dados/menu/darkback.png": {
+      "url": "assets/dados/menu/darkback.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/darkback.png.mask"
+    },
+    "./dados/menu/fundo.jpg": {
+      "url": "assets/dados/menu/fundo.jpg",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/fundo.jpg.mask"
+    },
+    "./dados/menu/logo.png": {
+      "url": "assets/dados/menu/logo.png",
+      "w": 512,
+      "h": 384,
+      "mask": "assets/dados/menu/logo.png.mask"
+    },
+    "./dados/menu/menutxt.png": {
+      "url": "assets/dados/menu/menutxt.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/menutxt.png.mask"
+    },
+    "./dados/menu/optionscover.png": {
+      "url": "assets/dados/menu/optionscover.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/optionscover.png.mask"
+    },
+    "./dados/menu/otherbots.png": {
+      "url": "assets/dados/menu/otherbots.png",
+      "w": 220,
+      "h": 70,
+      "mask": "assets/dados/menu/otherbots.png.mask"
+    },
+    "./dados/menu/recordstab.png": {
+      "url": "assets/dados/menu/recordstab.png",
+      "w": 486,
+      "h": 156,
+      "mask": "assets/dados/menu/recordstab.png.mask"
+    },
+    "./dados/menu/red.png": {
+      "url": "assets/dados/menu/red.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/red.png.mask"
+    },
+    "./dados/menu/select.png": {
+      "url": "assets/dados/menu/select.png",
+      "w": 360,
+      "h": 180,
+      "mask": "assets/dados/menu/select.png.mask"
+    },
+    "./dados/menu/slotback.png": {
+      "url": "assets/dados/menu/slotback.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/slotback.png.mask"
+    },
+    "./dados/menu/slotinsertcover.png": {
+      "url": "assets/dados/menu/slotinsertcover.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/slotinsertcover.png.mask"
+    },
+    "./dados/menu/slotloadcover.png": {
+      "url": "assets/dados/menu/slotloadcover.png",
+      "w": 800,
+      "h": 600,
+      "mask": "assets/dados/menu/slotloadcover.png.mask"
+    },
+    "./dados/menu/trofeus.png": {
+      "url": "assets/dados/menu/trofeus.png",
+      "w": 150,
+      "h": 50,
+      "mask": "assets/dados/menu/trofeus.png.mask"
+    },
+    "./dados/menu/volume.png": {
+      "url": "assets/dados/menu/volume.png",
+      "w": 260,
+      "h": 190,
+      "mask": "assets/dados/menu/volume.png.mask"
+    },
+    "./dados/menu/x85.jpg": {
+      "url": "assets/dados/menu/x85.jpg",
+      "w": 177,
+      "h": 38,
+      "mask": "assets/dados/menu/x85.jpg.mask"
+    },
+    "dados/jogo/mapas/tileset.png": {
+      "url": "assets/dados/jogo/mapas/tileset.png",
+      "w": 256,
+      "h": 160,
+      "mask": "assets/dados/jogo/mapas/tileset.png.mask"
+    }
+  },
+  "sounds": {
+    "./dados/sons/acess.wav": {
+      "url": "assets/dados/sons/acess.wav"
+    },
+    "./dados/sons/bomba.wav": {
+      "url": "assets/dados/sons/bomba.wav"
+    },
+    "./dados/sons/click.ogg": {
+      "url": "assets/dados/sons/click.wav"
+    },
+    "./dados/sons/explo.wav": {
+      "url": "assets/dados/sons/explo.wav"
+    },
+    "./dados/sons/tiro1.wav": {
+      "url": "assets/dados/sons/tiro1.wav"
+    },
+    "./dados/sons/tiro2.wav": {
+      "url": "assets/dados/sons/tiro2.wav"
+    },
+    "./dados/sons/tiro3.wav": {
+      "url": "assets/dados/sons/tiro3.wav"
+    },
+    "./dados/sons/zoop.ogg": {
+      "url": "assets/dados/sons/zoop.wav"
+    }
+  },
+  "music": {
+    "./dados/sons/progression_sasquamox.ogg": {
+      "m4a": "assets/dados/sons/progression_sasquamox.m4a",
+      "ogg": "assets/dados/sons/progression_sasquamox.ogg"
+    },
+    "./dados/sons/recharge_alvys18.ogg": {
+      "m4a": "assets/dados/sons/recharge_alvys18.m4a",
+      "ogg": "assets/dados/sons/recharge_alvys18.ogg"
+    }
+  },
+  "maps": {
+    "dados/jogo/mapas/fase1.fmp": {
+      "url": "assets/dados/jogo/mapas/fase1.json"
+    },
+    "dados/jogo/mapas/fase2.fmp": {
+      "url": "assets/dados/jogo/mapas/fase2.json"
+    },
+    "dados/jogo/mapas/fase3.fmp": {
+      "url": "assets/dados/jogo/mapas/fase3.json"
+    },
+    "dados/jogo/mapas/fase4.fmp": {
+      "url": "assets/dados/jogo/mapas/fase4.json"
+    },
+    "dados/jogo/mapas/fase5.fmp": {
+      "url": "assets/dados/jogo/mapas/fase5.json"
+    }
+  }
+}
