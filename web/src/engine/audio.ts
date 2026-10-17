@@ -75,14 +75,14 @@ export function initAudio(port: AudioPort, manifest: Manifest): Promise<void> {
     buffers.set(chave, null);
     tarefas.push(port.decodifica(e.url).then(
       b => { if (g === geracao) buffers.set(chave, b); },
-      () => { /* undecodable effect stays silent, like a failed Mix_LoadWAV after load */ }));
+      erro => { console.warn(`CA2: erro ao carregar o efeito ${k} (${e.url})`, erro); })); // orig: chienaudio2.cpp:218 printf; the effect stays silent
   }
   return Promise.all(tarefas).then(() => undefined);
 }
 
 /** Call from the first user gesture (pointerdown / keydown / touchend): resumes the context, starts pending music. */
 export function desbloqueiaAudio(): Promise<void> {
-  return porta ? porta.desbloqueia().catch(() => undefined) : Promise.resolve();
+  return porta ? porta.desbloqueia().catch(erro => { console.warn('CA2: falha ao desbloquear o audio', erro); }) : Promise.resolve();
 }
 
 // orig: chienaudio2.cpp:178 CA2_CarregaEfeito — 1-based id in load order, cached by path; 0 if the file is unknown

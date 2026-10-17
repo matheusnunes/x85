@@ -1,4 +1,4 @@
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 import {
   ganhosPan, initAudio, CA2_CarregaEfeito, CA2_TocaEfeito, CA2_TocaEfeitoTela, CA2_AjustaVolume,
   CA2_CarregaMusica, CA2_TocaMusica, desbloqueiaAudio, portaSilenciosa, type AudioPort,
@@ -103,4 +103,32 @@ test('silent port is always unlocked and frees voices immediately', async () => 
   await initAudio(portaSilenciosa(), man);
   const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
   for (let i = 0; i < 20; i++) expect(CA2_TocaEfeito(id, 0)).toBe(0);
+});
+test('a rejected decodifica() warns with the URL and the effect stays dropped', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const { port, tocados } = fake();
+    const erro = new Error('404');
+    port.decodifica = async () => { throw erro; };
+    await initAudio(port, { ...man, sounds: { 'dados/sons/explo.wav': { url: 'assets/dados/sons/explo.wav' } } });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0].join(' ')).toContain('assets/dados/sons/explo.wav');
+    expect(warn.mock.calls[0]).toContain(erro);
+    const id = CA2_CarregaEfeito('./dados/sons/explo.wav');
+    expect(id).toBe(1);
+    expect(CA2_TocaEfeito(id, 0)).toBe(-1);
+    expect(tocados.length).toBe(0);
+  } finally { warn.mockRestore(); }
+});
+test('a rejected unlock warns instead of being swallowed', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const { port } = fake(false);
+    const erro = new Error('resume');
+    port.desbloqueia = async () => { throw erro; };
+    await initAudio(port, man);
+    await expect(desbloqueiaAudio()).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]).toContain(erro);
+  } finally { warn.mockRestore(); }
 });
